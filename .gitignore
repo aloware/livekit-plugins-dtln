@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+
+# ONNX model weights — downloaded on demand, not committed
+src/livekit/plugins/dtln/models/
