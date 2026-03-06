@@ -162,6 +162,17 @@ The models are not bundled in this repository (to keep it lightweight). They are
 
 ---
 
+## References
+
+- **Original DTLN paper**: [Westhausen & Meyer, "Noise Reduction with DTLN", Interspeech 2020](https://www.isca-archive.org/interspeech_2020/westhausen20_interspeech.html)
+- **Original DTLN implementation & pretrained models**: [github.com/breizhn/DTLN](https://github.com/breizhn/DTLN)
+- **DataDog engineering article** — the inspiration for this plugin: [Building a Real-Time Noise Suppression Library](https://www.datadoghq.com/blog/engineering/noise-suppression-library/)
+- **LiveKit noise cancellation overview**: [docs.livekit.io — Noise Cancellation](https://docs.livekit.io/transport/media/noise-cancellation/)
+- **LiveKit Agents SDK**: [github.com/livekit/agents](https://github.com/livekit/agents)
+- **ONNX Runtime**: [onnxruntime.ai](https://onnxruntime.ai)
+
+---
+
 ## License
 
 The plugin code in this repository is released under the **MIT License**.
