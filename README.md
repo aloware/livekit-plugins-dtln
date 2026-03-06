@@ -24,40 +24,77 @@ Runs entirely **in-process** using [ONNX Runtime](https://onnxruntime.ai). No cl
 
 ## Installation
 
-### 1. Install the package
-
-**From GitHub** (recommended):
+**pip:**
 
 ```bash
 pip install git+https://github.com/aloware/livekit-plugins-dtln.git
 ```
 
-**In `requirements.txt`**:
+**requirements.txt:**
 
 ```
 git+https://github.com/aloware/livekit-plugins-dtln.git
 ```
 
-**From source** (for development):
+**From source:**
 
 ```bash
 git clone https://github.com/aloware/livekit-plugins-dtln.git
 pip install -e ./livekit-plugins-dtln
 ```
 
-### 2. Download the pretrained models
-
-The ONNX model weights (~4 MB total) are not bundled in the package. Download them once after install:
+After installing, download the pretrained ONNX model weights (~4 MB):
 
 ```bash
-# Via the LiveKit Agents CLI (recommended — runs all plugin download hooks):
 python agent.py download-files
-
-# Or directly:
-python -c "from livekit.plugins.dtln.noise_suppressor import download_models; download_models()"
 ```
 
-Models are saved to the package's own `models/` directory inside site-packages and persist across agent restarts.
+> Models are saved inside the package directory and persist across agent restarts.
+
+---
+
+## Usage
+
+### Session pipeline (recommended)
+
+```python
+from livekit.agents import room_io
+from livekit.plugins import dtln
+
+await session.start(
+    # ...,
+    room_options=room_io.RoomOptions(
+        audio_input=room_io.AudioInputOptions(
+            noise_cancellation=dtln.noise_suppression(),
+        ),
+    ),
+)
+```
+
+### Custom AudioStream
+
+```python
+from livekit import rtc
+from livekit.plugins import dtln
+
+stream = rtc.AudioStream.from_track(
+    track=track,
+    noise_cancellation=dtln.noise_suppression(),
+)
+```
+
+> **Note:** Create one `dtln.noise_suppression()` instance **per session**. Each instance holds stateful LSTM hidden states that must be scoped to a single call.
+
+> **Note:** DTLN is trained on raw microphone audio. Do not chain it with another noise cancellation model — applying two models in series produces unexpected results.
+
+### Custom model paths
+
+```python
+dtln.noise_suppression(
+    model_1_path="/path/to/model_1.onnx",
+    model_2_path="/path/to/model_2.onnx",
+)
+```
 
 ---
 
@@ -68,54 +105,6 @@ Models are saved to the package's own `models/` directory inside site-packages a
 - livekit-agents >= 1.4.4
 - onnxruntime >= 1.17.0
 - numpy >= 1.26.0
-
----
-
-## Usage
-
-### LiveKit Agents Framework
-
-```python
-from livekit.plugins import dtln
-from livekit.agents import room_io
-
-async def entrypoint(ctx: JobContext):
-    await ctx.connect()
-
-    session = AgentSession(...)
-    await session.start(
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                noise_cancellation=dtln.noise_suppression(),
-            ),
-        ),
-    )
-```
-
-> **Important**: Create one `dtln.noise_suppression()` instance **per session**. Each instance holds stateful LSTM hidden states scoped to a single call.
-
-### Standalone (without the Agents framework)
-
-```python
-from livekit.plugins.dtln import DTLNNoiseSuppressor
-
-suppressor = DTLNNoiseSuppressor()
-
-# suppressor._process(frame) accepts an rtc.AudioFrame and returns a denoised rtc.AudioFrame
-denoised_frame = suppressor._process(frame)
-```
-
-### Custom model paths
-
-By default the plugin downloads models to its own package directory. To use custom paths:
-
-```python
-dtln.noise_suppression(
-    model_1_path="/path/to/model_1.onnx",
-    model_2_path="/path/to/model_2.onnx",
-)
-```
 
 ---
 
@@ -170,7 +159,7 @@ Pretrained weights are the official DTLN models published by the original author
 | `model_1.onnx` | [breizhn/DTLN · pretrained_model/](https://github.com/breizhn/DTLN/tree/master/pretrained_model) |
 | `model_2.onnx` | [breizhn/DTLN · pretrained_model/](https://github.com/breizhn/DTLN/tree/master/pretrained_model) |
 
-The models are not bundled in this repository (to keep it lightweight). They are downloaded automatically by `download_models()` or `python agent.py download-files`.
+The models are not bundled in this repository (to keep it lightweight). They are downloaded automatically by `python agent.py download-files` or by calling `download_models()` directly.
 
 ---
 
