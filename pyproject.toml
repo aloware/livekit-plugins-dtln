@@ -5,14 +5,36 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "livekit-plugins-dtln"
 version = "0.1.0"
-description = "DTLN noise suppression plugin for LiveKit Agents"
+description = "DTLN noise suppression plugin for LiveKit Agents — self-hosted, in-process, no cloud API"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Aloware, Inc.", email = "dev@aloware.com" }]
 requires-python = ">=3.10"
+keywords = ["livekit", "noise-suppression", "noise-cancellation", "dtln", "onnx", "speech", "audio", "voip"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "livekit>=1.1.0",
     "livekit-agents>=1.4.4",
     "onnxruntime>=1.17.0",
     "numpy>=1.26.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/aloware/livekit-plugins-dtln"
+Repository = "https://github.com/aloware/livekit-plugins-dtln"
+"Bug Tracker" = "https://github.com/aloware/livekit-plugins-dtln/issues"
+Demo = "https://aloware.github.io/livekit-plugins-dtln/"
 
 [tool.setuptools.packages.find]
 where = ["src"]

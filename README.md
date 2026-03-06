@@ -29,13 +29,13 @@ Runs entirely **in-process** using [ONNX Runtime](https://onnxruntime.ai). No cl
 **pip:**
 
 ```bash
-pip install git+https://github.com/aloware/livekit-plugins-dtln.git
+pip install livekit-plugins-dtln
 ```
 
 **requirements.txt:**
 
 ```
-git+https://github.com/aloware/livekit-plugins-dtln.git
+livekit-plugins-dtln
 ```
 
 **From source:**
@@ -45,13 +45,7 @@ git clone https://github.com/aloware/livekit-plugins-dtln.git
 pip install -e ./livekit-plugins-dtln
 ```
 
-After installing, download the pretrained ONNX model weights (~4 MB):
-
-```bash
-python agent.py download-files
-```
-
-> Models are saved inside the package directory and persist across agent restarts.
+> The pretrained ONNX model weights (~4 MB) are bundled in the PyPI wheel — no separate download step needed.
 
 ---
 

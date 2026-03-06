@@ -1,0 +1,57 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Download pretrained DTLN models
+        # Models are gitignored but must be bundled in the wheel.
+        # They are the official pretrained weights from the original DTLN repo (MIT License).
+        run: |
+          mkdir -p src/livekit/plugins/dtln/models
+          BASE="https://github.com/breizhn/DTLN/raw/master/pretrained_model"
+          curl -fsSL "$BASE/model_1.onnx" -o src/livekit/plugins/dtln/models/model_1.onnx
+          curl -fsSL "$BASE/model_2.onnx" -o src/livekit/plugins/dtln/models/model_2.onnx
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/livekit-plugins-dtln
+    permissions:
+      id-token: write  # Required for Trusted Publishing (OIDC)
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
