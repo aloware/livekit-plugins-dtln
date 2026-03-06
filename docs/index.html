@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noise Cancellation Comparison — DTLN vs Krisp vs AI-coustics</title>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --purple: #a855f7;
+    --orange: #f97316;
+
+    --col-original: #6b7280;
+    --col-dtln: #3b82f6;
+    --col-krisp: #22c55e;
+    --col-bvc: #a855f7;
+    --col-quail-l: #22c55e;
+    --col-quail-vf: #a855f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 2.5rem 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  header p {
+    color: var(--muted);
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    max-width: 680px;
+    line-height: 1.6;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .badge-dtln { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .badge-ref  { background: rgba(100,116,139,0.12); color: var(--muted); border: 1px solid var(--border); }
+
+  main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 2.5rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  .sample-section {}
+
+  .sample-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .sample-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sample-header p {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+  }
+
+  .columns {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .columns-2 { grid-template-columns: repeat(2, 1fr); }
+  .columns-3 { grid-template-columns: repeat(3, 1fr); }
+  .columns-4 { grid-template-columns: repeat(4, 1fr); }
+
+  @media (max-width: 900px) {
+    .columns-3, .columns-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .columns-2, .columns-3, .columns-4 { grid-template-columns: 1fr; }
+    main { padding: 1.5rem 1rem; }
+    header { padding: 1.5rem 1rem 1rem; }
+  }
+
+  .audio-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-label {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 0.25rem 0.6rem;
+    padding: 0.75rem 1rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-label-text {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+    min-width: 0;
+  }
+
+  .color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .card-duration {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.15rem;
+    flex-shrink: 0;
+  }
+
+  .waveform-wrap {
+    padding: 0.75rem 1rem;
+    height: 72px;
+    display: flex;
+    align-items: center;
+  }
+
+  .waveform-wrap > div {
+    width: 100%;
+  }
+
+  .card-controls {
+    padding: 0.6rem 1rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .play-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+  }
+
+  .play-btn:hover { opacity: 0.85; }
+  .play-btn:active { opacity: 0.7; }
+
+  .play-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: white;
+  }
+
+  .progress-time {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 60px;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 2.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: 0.8rem;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  footer a { color: var(--muted); text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Noise Cancellation Comparison</h1>
+  <p>
+    Comparing <span class="badge badge-dtln">DTLN (self-hosted)</span> against
+    <span class="badge badge-ref">Krisp</span> and
+    <span class="badge badge-ref">AI-coustics</span> on the same source audio used by
+    <a href="https://docs.livekit.io/transport/media/noise-cancellation/" style="color:var(--accent)">LiveKit's comparison page</a>.
+    DTLN runs entirely in-process via ONNX Runtime — no cloud API.
+  </p>
+</header>
+
+<main>
+
+  <!-- ================================================================ -->
+  <!-- Sample 1: Coffee shop                                             -->
+  <!-- ================================================================ -->
+  <section class="sample-section">
+    <div class="sample-header">
+      <h2>☕ Coffee Shop Noise</h2>
+      <p>Ambient café noise mixed with speech. Source: LiveKit / Krisp demo.</p>
+    </div>
+    <div class="columns columns-3">
+      <div class="audio-card" id="card-krisp-orig">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-original)"></span>
+            Original
+          </div>
+          <span class="card-duration" id="dur-krisp-orig">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-krisp-orig"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-krisp-orig" style="background:var(--col-original)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-krisp-orig">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card" id="card-krisp-dtln">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-dtln)"></span>
+            DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span>
+          </div>
+          <span class="card-duration" id="dur-krisp-dtln">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-krisp-dtln"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-krisp-dtln" style="background:var(--col-dtln)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-krisp-dtln">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card" id="card-krisp-ref">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-krisp)"></span>
+            Krisp <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
+          </div>
+          <span class="card-duration" id="dur-krisp-ref">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-krisp-ref"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-krisp-ref" style="background:var(--col-krisp)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-krisp-ref">0:00</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ================================================================ -->
+  <!-- Sample 2: Taxi                                                    -->
+  <!-- ================================================================ -->
+  <section class="sample-section">
+    <div class="sample-header">
+      <h2>🚕 Taxi Ride</h2>
+      <p>Road and engine noise during a phone call. Source: LiveKit / Krisp demo.</p>
+    </div>
+    <div class="columns columns-4">
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-original)"></span>
+            Original
+          </div>
+          <span class="card-duration" id="dur-taxi-orig">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-taxi-orig"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-taxi-orig" style="background:var(--col-original)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-taxi-orig">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-dtln)"></span>
+            DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span>
+          </div>
+          <span class="card-duration" id="dur-taxi-dtln">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-taxi-dtln"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-taxi-dtln" style="background:var(--col-dtln)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-taxi-dtln">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-krisp)"></span>
+            Krisp NC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
+          </div>
+          <span class="card-duration" id="dur-taxi-nc">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-taxi-nc"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-taxi-nc" style="background:var(--col-krisp)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-taxi-nc">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-bvc)"></span>
+            Krisp BVC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
+          </div>
+          <span class="card-duration" id="dur-taxi-bvc">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-taxi-bvc"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-taxi-bvc" style="background:var(--col-bvc)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-taxi-bvc">0:00</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ================================================================ -->
+  <!-- Sample 3: Conversation                                            -->
+  <!-- ================================================================ -->
+  <section class="sample-section">
+    <div class="sample-header">
+      <h2>🗣️ Conversation with Background Noise</h2>
+      <p>Speech with mixed background noise. Source: LiveKit / AI-coustics demo.</p>
+    </div>
+    <div class="columns columns-4">
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-original)"></span>
+            Original
+          </div>
+          <span class="card-duration" id="dur-np-orig">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-np-orig"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-np-orig" style="background:var(--col-original)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-np-orig">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-dtln)"></span>
+            DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span>
+          </div>
+          <span class="card-duration" id="dur-np-dtln">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-np-dtln"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-np-dtln" style="background:var(--col-dtln)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-np-dtln">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-quail-l)"></span>
+            AI-coustics QUAIL_L <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
+          </div>
+          <span class="card-duration" id="dur-np-ql">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-np-ql"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-np-ql" style="background:var(--col-quail-l)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-np-ql">0:00</span>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="card-label">
+          <div class="card-label-text">
+            <span class="color-dot" style="background:var(--col-quail-vf)"></span>
+            AI-coustics QUAIL_VF_L <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
+          </div>
+          <span class="card-duration" id="dur-np-qvf">—</span>
+        </div>
+        <div class="waveform-wrap"><div id="wave-np-qvf"></div></div>
+        <div class="card-controls">
+          <button class="play-btn" id="play-np-qvf" style="background:var(--col-quail-vf)">
+            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+          </button>
+          <span class="progress-time" id="time-np-qvf">0:00</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>DTLN model: <a href="https://github.com/breizhn/DTLN">github.com/breizhn/DTLN</a> (Westhausen &amp; Meyer, Interspeech 2020)</span>
+  <span>Reference audio: <a href="https://docs.livekit.io/transport/media/noise-cancellation/">LiveKit docs</a></span>
+  <span>Inference: ONNX Runtime · in-process · no cloud API</span>
+</footer>
+
+<script>
+// ---------------------------------------------------------------------------
+// Track definitions
+// ---------------------------------------------------------------------------
+const LIVEKIT_CDN = 'https://docs.livekit.io/audio';
+
+// Each track has explicit hex colors so we can derive dim/bright variants:
+//   waveColor    = unplayed portion (dim)
+//   progressColor = played portion (full brightness)
+const C = {
+  original: { wave: '#3d4049', progress: '#9ca3af', cursor: '#d1d5db' },
+  dtln:     { wave: '#1e3a5f', progress: '#3b82f6', cursor: '#60a5fa' },
+  krisp:    { wave: '#14432a', progress: '#22c55e', cursor: '#4ade80' },
+  bvc:      { wave: '#3b1f5e', progress: '#a855f7', cursor: '#c084fc' },
+  quailL:   { wave: '#14432a', progress: '#22c55e', cursor: '#4ade80' },
+  quailVF:  { wave: '#3b1f5e', progress: '#a855f7', cursor: '#c084fc' },
+};
+
+const tracks = [
+  // Sample 1 — Coffee shop
+  { waveId: 'wave-krisp-orig', playId: 'play-krisp-orig', timeId: 'time-krisp-orig', durId: 'dur-krisp-orig',
+    url: 'audio/originals/krisp-original.mp3', c: C.original },
+  { waveId: 'wave-krisp-dtln', playId: 'play-krisp-dtln', timeId: 'time-krisp-dtln', durId: 'dur-krisp-dtln',
+    url: 'audio/dtln-krisp-original.wav', c: C.dtln },
+  { waveId: 'wave-krisp-ref',  playId: 'play-krisp-ref',  timeId: 'time-krisp-ref',  durId: 'dur-krisp-ref',
+    url: `${LIVEKIT_CDN}/krisp-processed.mp3`, c: C.krisp },
+
+  // Sample 2 — Taxi
+  { waveId: 'wave-taxi-orig', playId: 'play-taxi-orig', timeId: 'time-taxi-orig', durId: 'dur-taxi-orig',
+    url: 'audio/originals/taxi-sample.mp3', c: C.original },
+  { waveId: 'wave-taxi-dtln', playId: 'play-taxi-dtln', timeId: 'time-taxi-dtln', durId: 'dur-taxi-dtln',
+    url: 'audio/dtln-taxi-sample.wav', c: C.dtln },
+  { waveId: 'wave-taxi-nc',   playId: 'play-taxi-nc',   timeId: 'time-taxi-nc',   durId: 'dur-taxi-nc',
+    url: `${LIVEKIT_CDN}/taxi-sample-nc-processed.mp3`, c: C.krisp },
+  { waveId: 'wave-taxi-bvc',  playId: 'play-taxi-bvc',  timeId: 'time-taxi-bvc',  durId: 'dur-taxi-bvc',
+    url: `${LIVEKIT_CDN}/taxi-sample-bvc-processed.mp3`, c: C.bvc },
+
+  // Sample 3 — Conversation
+  { waveId: 'wave-np-orig', playId: 'play-np-orig', timeId: 'time-np-orig', durId: 'dur-np-orig',
+    url: 'audio/originals/noproblem_raw.wav', c: C.original },
+  { waveId: 'wave-np-dtln', playId: 'play-np-dtln', timeId: 'time-np-dtln', durId: 'dur-np-dtln',
+    url: 'audio/dtln-noproblem.wav', c: C.dtln },
+  { waveId: 'wave-np-ql',   playId: 'play-np-ql',   timeId: 'time-np-ql',   durId: 'dur-np-ql',
+    url: `${LIVEKIT_CDN}/noproblem-quail_l-processed.wav`, c: C.quailL },
+  { waveId: 'wave-np-qvf',  playId: 'play-np-qvf',  timeId: 'time-np-qvf',  durId: 'dur-np-qvf',
+    url: `${LIVEKIT_CDN}/noproblem-quail_vf_l-processed.wav`, c: C.quailVF },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function fmtTime(secs) {
+  if (!isFinite(secs)) return '—';
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+const PLAY_ICON = `<svg viewBox="0 0 16 16" fill="white" width="14" height="14"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>`;
+const PAUSE_ICON = `<svg viewBox="0 0 16 16" fill="white" width="14" height="14"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg>`;
+
+// ---------------------------------------------------------------------------
+// Init WaveSurfer instances
+// ---------------------------------------------------------------------------
+let currentlyPlaying = null;
+
+tracks.forEach(track => {
+  const ws = WaveSurfer.create({
+    container: `#${track.waveId}`,
+    url: track.url,
+    waveColor: track.c.wave,
+    progressColor: track.c.progress,
+    cursorColor: track.c.cursor,
+    cursorWidth: 2,
+    barWidth: 2,
+    barGap: 1,
+    barRadius: 2,
+    height: 52,
+    normalize: true,
+    interact: true,
+  });
+
+  const playBtn = document.getElementById(track.playId);
+  const timeEl  = document.getElementById(track.timeId);
+  const durEl   = document.getElementById(track.durId);
+
+  ws.on('ready', () => {
+    durEl.textContent = fmtTime(ws.getDuration());
+  });
+
+  ws.on('timeupdate', t => {
+    timeEl.textContent = fmtTime(t);
+  });
+
+  ws.on('play', () => {
+    // Pause whatever was playing before
+    if (currentlyPlaying && currentlyPlaying !== ws) {
+      currentlyPlaying.pause();
+    }
+    currentlyPlaying = ws;
+    playBtn.innerHTML = PAUSE_ICON;
+  });
+
+  ws.on('pause', () => {
+    playBtn.innerHTML = PLAY_ICON;
+    if (currentlyPlaying === ws) currentlyPlaying = null;
+  });
+
+  ws.on('finish', () => {
+    playBtn.innerHTML = PLAY_ICON;
+    if (currentlyPlaying === ws) currentlyPlaying = null;
+  });
+
+  playBtn.addEventListener('click', () => ws.playPause());
+});
+</script>
+</body>
+</html>
