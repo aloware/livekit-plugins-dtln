@@ -3,10 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DTLN Noise Cancellation — Aloware AI Voice</title>
-<meta name="description" content="Hear how Aloware's self-hosted DTLN noise suppression performs against Krisp and AI-coustics. No cloud API, no per-minute fees.">
+<title>LiveKit Self-Hosted Noise Cancellation Plugin — Aloware</title>
+<meta name="description" content="Aloware's open-source DTLN noise suppression plugin for LiveKit — runs entirely in-process via ONNX Runtime. No cloud API, no per-minute fees. Drop-in replacement for Krisp and AI-coustics on self-hosted LiveKit.">
+<meta name="author" content="Aloware">
+<meta name="keywords" content="LiveKit, noise cancellation, noise suppression, DTLN, self-hosted, open source, ONNX, voice AI, contact center, Aloware">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aloware.github.io/livekit-plugins-dtln/">
+<meta property="og:title" content="LiveKit Self-Hosted Noise Cancellation Plugin — Aloware">
+<meta property="og:description" content="Open-source DTLN noise suppression for LiveKit — no cloud API, no per-minute fees. Hear it against Krisp and AI-coustics.">
+<meta property="og:image" content="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png">
+<meta property="og:site_name" content="Aloware">
+
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@aloware">
+<meta name="twitter:title" content="LiveKit Self-Hosted Noise Cancellation Plugin — Aloware">
+<meta name="twitter:description" content="Open-source DTLN noise suppression for LiveKit — no cloud API, no per-minute fees. Hear it against Krisp and AI-coustics.">
+<meta name="twitter:image" content="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png">
+
 <link rel="shortcut icon" type="image/png" href="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/683831366d46bf75f2ca1b0a_aloware-32.png">
 <link rel="apple-touch-icon" href="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png">
+<link rel="canonical" href="https://aloware.github.io/livekit-plugins-dtln/">
 <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
 <style>
   :root {
@@ -368,7 +387,7 @@
     color: var(--muted);
   }
 
-  .footer-brand img { height: 16px; width: auto; opacity: 0.7; }
+  .footer-brand img { height: 20px; width: auto; opacity: 0.75; }
 
   .footer-links {
     display: flex;
@@ -721,8 +740,8 @@
 <footer>
   <div class="footer-inner">
     <div class="footer-brand">
-      <img src="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png" alt="Aloware">
-      © 2025 Aloware · Built with open-source DTLN
+      <img src="aloware-icon.png" alt="Aloware">
+      © <span id="footer-year"></span> Aloware · Built with open-source DTLN
     </div>
     <div class="footer-links">
       <a href="https://github.com/aloware/livekit-plugins-dtln">Plugin repo</a>
@@ -848,6 +867,8 @@ tracks.forEach(track => {
 
   playBtn.addEventListener('click', () => ws.playPause());
 });
+
+document.getElementById('footer-year').textContent = new Date().getFullYear();
 </script>
 </body>
 </html>
