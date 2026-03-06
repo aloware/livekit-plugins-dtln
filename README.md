@@ -83,6 +83,24 @@ stream = rtc.AudioStream.from_track(
 
 > **Note:** DTLN is trained on raw microphone audio. Do not chain it with another noise cancellation model — applying two models in series produces unexpected results.
 
+### Tuning suppression strength
+
+```python
+dtln.noise_suppression(
+    strength=0.5,  # 0.0 = bypass, 1.0 = full suppression (default: 0.5)
+)
+```
+
+`strength` is a wet/dry blend factor. At `0.5`, the output is an equal mix of the denoised signal and the original. Lower values preserve more of the original audio — useful if the model is over-suppressing speech (e.g. on telephone/SIP audio). Higher values apply more aggressive noise reduction.
+
+### Debug logging
+
+```python
+dtln.noise_suppression(debug_logging=True)
+```
+
+Logs per-block diagnostics (spectral mask mean/min/max, input and output RMS) at `DEBUG` level every 100 blocks (~800 ms). Useful for diagnosing over-suppression: if `mask_mean` is consistently below 0.3, the model is treating speech as noise — lower `strength`.
+
 ### Custom model paths
 
 ```python
