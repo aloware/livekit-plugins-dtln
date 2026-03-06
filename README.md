@@ -162,6 +162,18 @@ Benchmarked on Apple M3 Pro, processing 16 kHz mono audio:
 
 The `__init__` method runs a dummy forward pass to trigger ONNX Runtime's JIT compilation before the first real audio frame arrives, eliminating the cold-start stall.
 
+### Noise reduction on sample audio
+
+Tested by running original audio files through `DTLNNoiseSuppressor` and measuring RMS reduction:
+
+| File | Noise Level | RMS Reduction | Notes |
+|---|---|---|---|
+| `krisp-original.mp3` | Moderate noise | 22.6% | Active suppression |
+| `taxi-sample.mp3` | Heavy background noise | 59.5% | Strong suppression |
+| `noproblem_raw.wav` | Clean speech | 5.4% | Correctly preserves speech |
+
+Run `python tests/test_noise_suppression.py` to reproduce.
+
 ---
 
 ## Models
