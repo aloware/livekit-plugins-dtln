@@ -20,7 +20,7 @@ Runs entirely **in-process** using [ONNX Runtime](https://onnxruntime.ai). No cl
 | **LiveKit** | Works with self-hosted | Requires LiveKit Cloud |
 | **Latency** | ~8 ms (one block shift) | Network round-trip |
 | **Privacy** | Audio never leaves your server | Audio sent to third party |
-| **Real-time factor** | ~0.05× (20× faster than real-time) | Varies |
+| **Real-time factor** | ~0.05× | Varies |
 
 ---
 
@@ -157,7 +157,6 @@ Benchmarked on Apple M3 Pro, processing 16 kHz mono audio:
 |---|---|
 | Steady-state latency per block | ~0.7 ms |
 | Real-time factor | ~0.05× |
-| Headroom vs real-time | ~20× |
 | Cold-start (first inference) | ~500 ms (amortized by warmup in `__init__`) |
 
 The `__init__` method runs a dummy forward pass to trigger ONNX Runtime's JIT compilation before the first real audio frame arrives, eliminating the cold-start stall.
