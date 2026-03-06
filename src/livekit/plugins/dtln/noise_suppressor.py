@@ -62,6 +62,8 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self,
         model_1_path: str = os.path.join(_DEFAULT_MODEL_DIR, "model_1.onnx"),
         model_2_path: str = os.path.join(_DEFAULT_MODEL_DIR, "model_2.onnx"),
+        strength: float = 0.5,
+        debug_logging: bool = False,
     ) -> None:
         self._sess1 = ort.InferenceSession(model_1_path)
         self._sess2 = ort.InferenceSession(model_2_path)
@@ -85,6 +87,17 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         # Queues for handling arbitrary incoming frame sizes
         self._input_queue = np.zeros(0, dtype=np.float32)
         self._output_queue = np.zeros(0, dtype=np.float32)
+
+        # Dry queue — tracks original 16 kHz samples aligned with DTLN pipeline
+        # latency so wet/dry blending stays in sync
+        self._dry_queue = np.zeros(0, dtype=np.float32)
+
+        # Wet/dry blend: 0.0 = full bypass, 1.0 = full suppression
+        self._strength = max(0.0, min(1.0, strength))
+
+        # Debug logging: logs mask stats + RMS every 100 blocks
+        self._debug_logging = debug_logging
+        self._debug_frame_count = 0
 
         # Resamplers — created lazily on the first frame
         self._downsampler: rtc.AudioResampler | None = None
@@ -173,6 +186,7 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         ])
 
         self._input_queue = np.concatenate([self._input_queue, samples_16k])
+        self._dry_queue = np.concatenate([self._dry_queue, samples_16k])
 
         # Process in BLOCK_SHIFT (128-sample) steps; count steps taken.
         n_steps = 0
@@ -205,6 +219,12 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
 
         out_16k = self._output_queue[:n_produced]
         self._output_queue = self._output_queue[n_produced:]
+
+        # Wet/dry blend: mix denoised with original to prevent over-suppression
+        if self._strength < 1.0:
+            dry_16k = self._dry_queue[:n_produced]
+            out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k
+        self._dry_queue = self._dry_queue[n_produced:]
 
         # Build 16 kHz AudioFrame and upsample back to native rate
         out_int16_16k = (np.clip(out_16k, -1.0, 1.0) * 32767.0).astype(np.int16)
@@ -284,5 +304,16 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         })
         denoised = out2[0].reshape(_BLOCK_LEN)  # (512,)
         self._state2 = out2[1]
+
+        if self._debug_logging and self._debug_frame_count % 100 == 0:
+            logger.debug(
+                "DTLN block: mask_mean=%.3f mask_min=%.3f mask_max=%.3f "
+                "input_rms=%.5f output_rms=%.5f strength=%.2f",
+                float(mask.mean()), float(mask.min()), float(mask.max()),
+                float(np.sqrt(np.mean(block**2))),
+                float(np.sqrt(np.mean(denoised**2))),
+                self._strength,
+            )
+        self._debug_frame_count += 1
 
         return denoised
