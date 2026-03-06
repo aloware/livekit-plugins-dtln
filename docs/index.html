@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Noise Cancellation Comparison — DTLN vs Krisp vs AI-coustics</title>
+<title>DTLN Noise Cancellation — Aloware AI Voice</title>
+<meta name="description" content="Hear how Aloware's self-hosted DTLN noise suppression performs against Krisp and AI-coustics. No cloud API, no per-minute fees.">
+<link rel="shortcut icon" type="image/png" href="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/683831366d46bf75f2ca1b0a_aloware-32.png">
+<link rel="apple-touch-icon" href="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png">
 <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
 <style>
   :root {
@@ -36,23 +39,153 @@
     min-height: 100vh;
   }
 
+  .top-bar {
+    background: #0a0c14;
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .top-bar-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+  }
+
+  .top-bar-logo img {
+    height: 22px;
+    width: auto;
+  }
+
+  .top-bar-logo span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .top-bar-link {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .top-bar-link:hover { color: var(--text); }
+
+  .hero {
+    background: linear-gradient(160deg, #0f1117 0%, #111827 60%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 3.5rem 2.5rem 3rem;
+    text-align: center;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    max-width: 700px;
+    margin: 0 auto 1rem;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    color: var(--muted);
+    font-size: 1rem;
+    max-width: 560px;
+    margin: 0 auto 2rem;
+    line-height: 1.7;
+  }
+
+  .hero-pills {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 2rem;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: rgba(255,255,255,0.03);
+  }
+
+  .pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--accent);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.65rem 1.4rem;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  .hero-cta:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
   header {
     border-bottom: 1px solid var(--border);
-    padding: 2rem 2.5rem 1.5rem;
+    padding: 1.75rem 2.5rem 1.25rem;
     max-width: 1400px;
     margin: 0 auto;
   }
 
-  header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+  header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
   }
 
   header p {
     color: var(--muted);
-    margin-top: 0.5rem;
-    font-size: 0.9rem;
+    margin-top: 0.4rem;
+    font-size: 0.875rem;
     max-width: 680px;
     line-height: 1.6;
   }
@@ -219,29 +352,84 @@
 
   footer {
     border-top: 1px solid var(--border);
-    padding: 1.25rem 2.5rem;
-    max-width: 1400px;
-    margin: 0 auto;
+    background: #0a0c14;
+    padding: 1.5rem 2.5rem;
     color: var(--muted);
     font-size: 0.8rem;
+  }
+
+  .footer-inner {
+    max-width: 1400px;
+    margin: 0 auto;
     display: flex;
-    gap: 1.5rem;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .footer-brand img { height: 16px; width: auto; opacity: 0.7; }
+
+  .footer-links {
+    display: flex;
+    gap: 1.25rem;
     flex-wrap: wrap;
   }
 
-  footer a { color: var(--muted); text-decoration: underline; }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--text); }
 </style>
 </head>
 <body>
 
+<!-- Top navigation bar -->
+<div class="top-bar">
+  <a class="top-bar-logo" href="https://aloware.com" target="_blank" rel="noopener">
+    <img src="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png" alt="Aloware">
+    <span>Aloware</span>
+  </a>
+  <a class="top-bar-link" href="https://github.com/aloware/livekit-plugins-dtln" target="_blank" rel="noopener">
+    View on GitHub →
+  </a>
+</div>
+
+<!-- Hero / marketing section -->
+<div class="hero">
+  <div class="hero-eyebrow">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="8" opacity=".2"/><circle cx="8" cy="8" r="4"/></svg>
+    Aloware AI Voice · Open Source
+  </div>
+  <h1>Crystal-clear calls.<br><em>No cloud. No fees.</em></h1>
+  <p class="hero-sub">
+    Aloware's DTLN noise suppression runs entirely on your server — no third-party API, no audio leaving your infrastructure. Compare it live against Krisp and AI-coustics below.
+  </p>
+  <div class="hero-pills">
+    <span class="pill"><span class="pill-dot"></span> Self-hosted · in-process</span>
+    <span class="pill"><span class="pill-dot"></span> ~8 ms latency</span>
+    <span class="pill"><span class="pill-dot"></span> 20× faster than real-time</span>
+    <span class="pill"><span class="pill-dot"></span> Works with self-hosted LiveKit</span>
+    <span class="pill"><span class="pill-dot"></span> Open weights · MIT license</span>
+  </div>
+  <a class="hero-cta" href="https://github.com/aloware/livekit-plugins-dtln" target="_blank" rel="noopener">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    Get the plugin
+  </a>
+</div>
+
+<!-- Comparison section label -->
 <header>
-  <h1>Noise Cancellation Comparison</h1>
+  <h2>Audio Comparison</h2>
   <p>
-    Comparing <span class="badge badge-dtln">DTLN (self-hosted)</span> against
-    <span class="badge badge-ref">Krisp</span> and
-    <span class="badge badge-ref">AI-coustics</span> on the same source audio used by
-    <a href="https://docs.livekit.io/transport/media/noise-cancellation/" style="color:var(--accent)">LiveKit's comparison page</a>.
-    DTLN runs entirely in-process via ONNX Runtime — no cloud API.
+    Same source audio as <a href="https://docs.livekit.io/transport/media/noise-cancellation/" style="color:var(--accent)">LiveKit's noise cancellation page</a>.
+    DTLN (ours) runs in-process via ONNX Runtime. Reference tracks stream from LiveKit's CDN.
   </p>
 </header>
 
@@ -474,9 +662,18 @@
 </main>
 
 <footer>
-  <span>DTLN model: <a href="https://github.com/breizhn/DTLN">github.com/breizhn/DTLN</a> (Westhausen &amp; Meyer, Interspeech 2020)</span>
-  <span>Reference audio: <a href="https://docs.livekit.io/transport/media/noise-cancellation/">LiveKit docs</a></span>
-  <span>Inference: ONNX Runtime · in-process · no cloud API</span>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="https://cdn.prod.website-files.com/67ac801aadc0bbd4b1d89967/6838313987f7e8853a5bde1f_aloware-256.png" alt="Aloware">
+      © 2025 Aloware · Built with open-source DTLN
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/aloware/livekit-plugins-dtln">Plugin repo</a>
+      <a href="https://github.com/breizhn/DTLN">DTLN model</a>
+      <a href="https://docs.livekit.io/transport/media/noise-cancellation/">LiveKit docs</a>
+      <a href="https://aloware.com" target="_blank" rel="noopener">aloware.com</a>
+    </div>
+  </div>
 </footer>
 
 <script>
