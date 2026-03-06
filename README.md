@@ -7,6 +7,8 @@ Runs entirely **in-process** using [ONNX Runtime](https://onnxruntime.ai). No cl
 > Based on [Westhausen & Meyer, "Noise Reduction with DTLN", Interspeech 2020](https://www.isca-archive.org/interspeech_2020/westhausen20_interspeech.html)
 > Original implementation: [github.com/breizhn/DTLN](https://github.com/breizhn/DTLN)
 
+**[Live audio comparison demo →](https://aloware.github.io/livekit-plugins-dtln/)**
+
 ---
 
 ## Why DTLN?
