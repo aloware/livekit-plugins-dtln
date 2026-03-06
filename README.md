@@ -24,28 +24,40 @@ Runs entirely **in-process** using [ONNX Runtime](https://onnxruntime.ai). No cl
 
 ## Installation
 
+### 1. Install the package
+
+**From GitHub** (recommended):
+
 ```bash
 pip install git+https://github.com/aloware/livekit-plugins-dtln.git
 ```
 
-Then download the pretrained ONNX models (~4 MB total):
+**In `requirements.txt`**:
 
-```bash
-python -c "from livekit.plugins.dtln.noise_suppressor import download_models; download_models()"
+```
+git+https://github.com/aloware/livekit-plugins-dtln.git
 ```
 
-Or, if you're using the LiveKit Agents CLI:
-
-```bash
-python agent.py download-files
-```
-
-### From source
+**From source** (for development):
 
 ```bash
 git clone https://github.com/aloware/livekit-plugins-dtln.git
 pip install -e ./livekit-plugins-dtln
 ```
+
+### 2. Download the pretrained models
+
+The ONNX model weights (~4 MB total) are not bundled in the package. Download them once after install:
+
+```bash
+# Via the LiveKit Agents CLI (recommended — runs all plugin download hooks):
+python agent.py download-files
+
+# Or directly:
+python -c "from livekit.plugins.dtln.noise_suppressor import download_models; download_models()"
+```
+
+Models are saved to the package's own `models/` directory inside site-packages and persist across agent restarts.
 
 ---
 
