@@ -248,6 +248,7 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         )
 
     def _close(self) -> None:
+        self._enabled = False
         self._sess1 = None  # type: ignore[assignment]
         self._sess2 = None  # type: ignore[assignment]
 

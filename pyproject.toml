@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "livekit-plugins-dtln"
-version = "0.1.0"
+version = "0.1.1"
 description = "DTLN noise suppression plugin for LiveKit Agents — self-hosted, in-process, no cloud API"
 readme = "README.md"
 license = { file = "LICENSE" }
