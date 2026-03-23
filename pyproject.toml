@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "livekit>=1.1.0",
+    "livekit>=1.0.25",
     "livekit-agents>=1.4.4",
     "onnxruntime>=1.17.0",
     "numpy>=1.26.0",

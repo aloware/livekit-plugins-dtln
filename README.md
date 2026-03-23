@@ -115,7 +115,7 @@ dtln.noise_suppression(
 ## Requirements
 
 - Python >= 3.10
-- livekit >= 1.1.0
+- livekit >= 1.0.25
 - livekit-agents >= 1.4.4
 - onnxruntime >= 1.17.0
 - numpy >= 1.26.0
@@ -167,9 +167,9 @@ Tested by running original audio files through `DTLNNoiseSuppressor` and measuri
 
 | File | Noise Level | RMS Reduction | Notes |
 |---|---|---|---|
-| `krisp-original.mp3` | Moderate noise | 22.6% | Active suppression |
-| `taxi-sample.mp3` | Heavy background noise | 59.5% | Strong suppression |
-| `noproblem_raw.wav` | Clean speech | 5.4% | Correctly preserves speech |
+| `krisp-original.mp3` | Moderate noise | 37.1% | Active suppression |
+| `taxi-sample.mp3` | Heavy background noise | 48.6% | Strong suppression |
+| `noproblem_raw.wav` | Clean speech | 34.1% | Correctly preserves speech |
 
 Run `python tests/test_noise_suppression.py` to reproduce.
 
