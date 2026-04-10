@@ -28,6 +28,16 @@ _N_BINS = _BLOCK_LEN // 2 + 1
 
 _DEFAULT_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 
+# High-frequency rolloff to prevent metallic artifacts from spectral masking.
+# DTLN's spectral mask can leave high frequencies untouched while heavily
+# suppressing low/mid, creating an unnatural thin sound. This precomputed
+# filter gently attenuates 4-8 kHz on the 512-sample block (257 rfft bins).
+_HF_ROLLOFF_FREQ = np.fft.rfftfreq(_BLOCK_LEN, d=1.0 / _SAMPLE_RATE)
+_HF_ROLLOFF = np.where(
+    _HF_ROLLOFF_FREQ <= 4000, 1.0,
+    np.maximum(0.1, 1.0 - (_HF_ROLLOFF_FREQ - 4000) / 4000),
+).astype(np.float32)
+
 _DTLN_BASE_URL = "https://github.com/breizhn/DTLN/raw/master/pretrained_model"
 _MODEL_FILES = ["model_1.onnx", "model_2.onnx"]
 
@@ -318,6 +328,10 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         })
         denoised = out2[0].reshape(_BLOCK_LEN)  # (512,)
         self._state2 = out2[1]
+
+        # Apply high-frequency rolloff to prevent metallic artifacts
+        denoised_spec = np.fft.rfft(denoised)
+        denoised = np.fft.irfft(denoised_spec * _HF_ROLLOFF, n=_BLOCK_LEN).astype(np.float32)
 
         if self._debug_logging and self._debug_frame_count % 100 == 0:
             logger.debug(
