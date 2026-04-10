@@ -582,7 +582,7 @@
   <h2>Audio Comparison</h2>
   <p>
     Same source audio as <a href="https://docs.livekit.io/transport/media/noise-cancellation/" style="color:var(--accent)">LiveKit's noise cancellation page</a>.
-    Play the samples below to hear DTLN against Krisp and AI-coustics. Transcripts are from Deepgram Nova 3 — <del>strikethrough</del> indicates hallucinated or incorrect words caused by background audio.
+    Play the samples below to hear DTLN against Krisp and AI-coustics.
   </p>
 </header>
 
@@ -594,7 +594,7 @@
   <section class="sample-section">
     <div class="sample-header">
       <h2>☕ Coffee Shop Noise</h2>
-      <p>Ambient café noise mixed with speech. To hear the effect of noise cancellation, play the samples below.</p>
+      <p>Ambient café noise mixed with speech. All three produce identical transcripts. Transcripts by Deepgram Nova 3.</p>
     </div>
     <div class="columns columns-2">
       <div class="audio-card">
@@ -607,6 +607,7 @@
           <button class="play-btn" id="play-cs-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-cs-orig">0:00</span>
         </div>
+        <div class="transcript">Hey there, can you hear me alright? I've got the windows open and the traffic can get pretty noisy around this time.</div>
       </div>
       <div class="audio-card">
         <div class="card-label">
@@ -618,6 +619,7 @@
           <button class="play-btn" id="play-cs-dtln" style="background:var(--col-dtln)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-cs-dtln">0:00</span>
         </div>
+        <div class="transcript">Hey there, can you hear me alright? I've got the windows open and the traffic can get pretty noisy around this time.</div>
       </div>
     </div>
     <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
@@ -632,6 +634,7 @@
           <button class="play-btn" id="play-cs-krisp" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-cs-krisp">0:00</span>
         </div>
+        <div class="transcript">Hey there, can you hear me alright? I've got the windows open and the traffic can get pretty noisy around this time.</div>
       </div>
     </div>
   </section>
@@ -644,7 +647,7 @@
   <section class="sample-section">
     <div class="sample-header">
       <h2>🚕 Taxi Ride</h2>
-      <p>Road and engine noise during a phone call.</p>
+      <p>Road and engine noise during a phone call. <del style="color:#ef4444">Strikethrough</del> indicates STT errors caused by background noise. Transcripts by Deepgram Nova 3.</p>
     </div>
     <div class="columns columns-2">
       <div class="audio-card">
@@ -657,6 +660,7 @@
           <button class="play-btn" id="play-tx-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-tx-orig">0:00</span>
         </div>
+        <div class="transcript">Hi there, can you hear me alright? <del>Pretty bad.</del> Sorry, it's pretty noisy in the taxi. <del>Sorry, I'll get you there for the second.</del> Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
       <div class="audio-card">
         <div class="card-label">
@@ -668,6 +672,7 @@
           <button class="play-btn" id="play-tx-dtln" style="background:var(--col-dtln)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-tx-dtln">0:00</span>
         </div>
+        <div class="transcript">Hi there, can you hear me alright? Sorry, it's pretty noisy in the taxi. <del>Sorry, I'll get you there pretty soon.</del> Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
     </div>
     <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
@@ -682,6 +687,7 @@
           <button class="play-btn" id="play-tx-knc" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-tx-knc">0:00</span>
         </div>
+        <div class="transcript">Hi there, <del>can</del> hear me alright? <del>Pretty bad.</del> Sorry, it's pretty noisy in the taxi. <del>No,</del> I'll get you there pretty soon. Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
       <div class="audio-card">
         <div class="card-label">
@@ -693,83 +699,9 @@
           <button class="play-btn" id="play-tx-bvc" style="background:var(--col-bvc)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-tx-bvc">0:00</span>
         </div>
+        <div class="transcript">Hi there, can you hear me alright? Sorry, it's pretty noisy in the taxi. Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
     </div>
-  </section>
-
-  <hr class="divider">
-
-  <!-- ================================================================ -->
-  <!-- Section 2: Voice Isolation — gym sample                           -->
-  <!-- ================================================================ -->
-  <section class="sample-section">
-    <div class="sample-header">
-      <h2>🎙️ Voice Isolation</h2>
-      <p>Listen to the same gym membership sample with original audio, Krisp BVC, ai-coustics Voice Focus (QUAIL_VF_L), and DTLN + Voice Isolation. Segments marked with a <del>strikethrough</del> indicate unwanted content that would confuse the agent.</p>
-    </div>
-    <div class="columns columns-2">
-      <div class="audio-card">
-        <div class="card-label">
-          <div class="card-label-text"><span class="color-dot" style="background:var(--col-original)"></span> Original</div>
-          <span class="card-duration" id="dur-vi-orig">—</span>
-        </div>
-        <div class="waveform-wrap"><div id="wave-vi-orig"></div></div>
-        <div class="card-controls">
-          <button class="play-btn" id="play-vi-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
-          <span class="progress-time" id="time-vi-orig">0:00</span>
-        </div>
-        <div class="transcript"><del>Can I get you the</del> How peaceful <del>Okay? Did you catch the halftime show? I think about that it was a Spanish</del> Yes. I've just received an email that my gym membership is canceled.<br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
-      </div>
-      <div class="audio-card">
-        <div class="card-label">
-          <div class="card-label-text"><span class="color-dot" style="background:var(--col-dtln-spk)"></span> DTLN + Voice Isolation <span class="badge badge-new" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span></div>
-          <span class="card-duration" id="dur-vi-spk">—</span>
-        </div>
-        <div class="waveform-wrap"><div id="wave-vi-spk"></div></div>
-        <div class="card-controls">
-          <button class="play-btn" id="play-vi-spk" style="background:var(--col-dtln-spk)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
-          <span class="progress-time" id="time-vi-spk">0:00</span>
-        </div>
-        <div class="transcript"><em style="color:var(--muted)">Transcription coming soon — run STT on processed audio to compare.</em><br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
-      </div>
-    </div>
-    <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
-    <div class="columns columns-2">
-      <div class="audio-card">
-        <div class="card-label">
-          <div class="card-label-text"><span class="color-dot" style="background:var(--col-krisp)"></span> Krisp BVC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
-          <span class="card-duration" id="dur-vi-bvc">—</span>
-        </div>
-        <div class="waveform-wrap"><div id="wave-vi-bvc"></div></div>
-        <div class="card-controls">
-          <button class="play-btn" id="play-vi-bvc" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
-          <span class="progress-time" id="time-vi-bvc">0:00</span>
-        </div>
-        <div class="transcript"><del>Oh, please. Four.</del> Okay. Yes. I've just received an email that my gym membership is canceled.<br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
-      </div>
-      <div class="audio-card">
-        <div class="card-label">
-          <div class="card-label-text"><span class="color-dot" style="background:var(--col-bvc)"></span> AI-coustics QUAIL_VF_L <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
-          <span class="card-duration" id="dur-vi-qvf">—</span>
-        </div>
-        <div class="waveform-wrap"><div id="wave-vi-qvf"></div></div>
-        <div class="card-controls">
-          <button class="play-btn" id="play-vi-qvf" style="background:var(--col-bvc)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
-          <span class="progress-time" id="time-vi-qvf">0:00</span>
-        </div>
-        <div class="transcript">How peaceful? Okay. Yes. I've just received an email that my gym membership is canceled.<br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
-      </div>
-    </div>
-
-    <table class="wer-table">
-      <thead><tr><th>Model</th><th>WER</th></tr></thead>
-      <tbody>
-        <tr><td>Original</td><td class="wer-bad">117.6%</td></tr>
-        <tr><td>Krisp BVC</td><td class="wer-ok">23.5%</td></tr>
-        <tr><td>AI-coustics QUAIL_VF_L</td><td class="wer-good">11.8%</td></tr>
-        <tr><td>DTLN + Voice Isolation</td><td><em style="color:var(--muted)">TBD</em></td></tr>
-      </tbody>
-    </table>
   </section>
 
   <hr class="divider">
@@ -780,7 +712,7 @@
   <section class="sample-section">
     <div class="sample-header">
       <h2>🔇 Background Noise Suppression</h2>
-      <p>Listen to the same gym membership sample with original audio, Krisp NC, ai-coustics Quail (QUAIL_L), and DTLN. Segments marked with a <del>strikethrough</del> indicate unwanted content that would confuse the agent.</p>
+      <p>Listen to the same gym membership sample with original audio, Krisp NC, ai-coustics Quail (QUAIL_L), and DTLN. Segments marked with <del style="color:#ef4444">strikethrough</del> indicate hallucinated or incorrect words caused by background audio. Transcripts by Deepgram Nova 3.</p>
     </div>
     <div class="columns columns-2">
       <div class="audio-card">
@@ -793,7 +725,7 @@
           <button class="play-btn" id="play-ns-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-ns-orig">0:00</span>
         </div>
-        <div class="transcript"><del>Can I get you the</del> How peaceful <del>Okay? Did you catch the halftime show? I think about that it was a Spanish</del> Yes. I've just received an email that my gym membership is canceled.<br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
+        <div class="transcript"><del>Can I get you the</del> How peaceful <del>Okay? Did you catch the halftime show? I think about that it was a Spanish</del> Yes. I've just received an email that my gym membership is canceled.</div>
       </div>
       <div class="audio-card">
         <div class="card-label">
@@ -805,7 +737,7 @@
           <button class="play-btn" id="play-ns-dtln" style="background:var(--col-dtln)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-ns-dtln">0:00</span>
         </div>
-        <div class="transcript"><em style="color:var(--muted)">Transcription coming soon — run STT on processed audio to compare.</em><br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
+        <div class="transcript"><del>Oh peaceful okay luckily no one was there did you catch the halftime show i think monday was this there's no</del> Yes. I just received an email that my gym membership is canceled.</div>
       </div>
     </div>
     <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
@@ -820,7 +752,7 @@
           <button class="play-btn" id="play-ns-knc" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-ns-knc">0:00</span>
         </div>
-        <div class="transcript"><del>Oh, peaceful.</del> Okay. <del>That's an off time show?</del> I just received an email that my gym membership is canceled.<br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
+        <div class="transcript"><del>Oh, peaceful.</del> Okay. <del>That's an off time show?</del> I just received an email that my gym membership is canceled.</div>
       </div>
       <div class="audio-card">
         <div class="card-label">
@@ -832,7 +764,7 @@
           <button class="play-btn" id="play-ns-ql" style="background:var(--col-bvc)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
           <span class="progress-time" id="time-ns-ql">0:00</span>
         </div>
-        <div class="transcript">How peaceful? Okay. <del>I buy that with</del> Yes. I've just received an email that my gym membership is canceled.<br><span style="color:var(--muted);font-size:0.7rem">STT by Deepgram Nova 3</span></div>
+        <div class="transcript">How peaceful? Okay. <del>I buy that with</del> Yes. I've just received an email that my gym membership is canceled.</div>
       </div>
     </div>
   </section>
@@ -890,17 +822,7 @@ const tracks = [
   { waveId: 'wave-tx-bvc',   playId: 'play-tx-bvc',   timeId: 'time-tx-bvc',   durId: 'dur-tx-bvc',
     url: 'audio/competitors/taxi-sample-bvc-processed.mp3', c: C.bvc },
 
-  // Section 3 — Voice Isolation (gym sample)
-  { waveId: 'wave-vi-orig',  playId: 'play-vi-orig',  timeId: 'time-vi-orig',  durId: 'dur-vi-orig',
-    url: 'audio/originals/gym.wav', c: C.original },
-  { waveId: 'wave-vi-bvc',   playId: 'play-vi-bvc',   timeId: 'time-vi-bvc',   durId: 'dur-vi-bvc',
-    url: 'audio/competitors/gym-krisp-bvc.wav', c: C.krisp },
-  { waveId: 'wave-vi-qvf',   playId: 'play-vi-qvf',   timeId: 'time-vi-qvf',   durId: 'dur-vi-qvf',
-    url: 'audio/competitors/gym-quail-vfl.wav', c: C.bvc },
-  { waveId: 'wave-vi-spk',   playId: 'play-vi-spk',   timeId: 'time-vi-spk',   durId: 'dur-vi-spk',
-    url: 'audio/dtln-spk-gym.wav', c: C.dtlnSpk },
-
-  // Section 4 — Background Noise Suppression (gym sample)
+  // Section 3 — Background Noise Suppression (gym sample)
   { waveId: 'wave-ns-orig',  playId: 'play-ns-orig',  timeId: 'time-ns-orig',  durId: 'dur-ns-orig',
     url: 'audio/originals/gym.wav', c: C.original },
   { waveId: 'wave-ns-knc',   playId: 'play-ns-knc',   timeId: 'time-ns-knc',   durId: 'dur-ns-knc',

@@ -2,7 +2,6 @@ from livekit.agents import Plugin
 import logging
 
 from .noise_suppressor import DTLNNoiseSuppressor
-from .speaker_extractor import SpeakerExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -31,4 +30,4 @@ def noise_suppression(**kwargs) -> DTLNNoiseSuppressor:
 
 Plugin.register_plugin(DTLNPlugin())
 
-__all__ = ["DTLNNoiseSuppressor", "SpeakerExtractor", "noise_suppression"]
+__all__ = ["DTLNNoiseSuppressor", "noise_suppression"]
