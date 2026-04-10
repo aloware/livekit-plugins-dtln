@@ -63,6 +63,7 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         model_1_path: str = os.path.join(_DEFAULT_MODEL_DIR, "model_1.onnx"),
         model_2_path: str = os.path.join(_DEFAULT_MODEL_DIR, "model_2.onnx"),
         strength: float = 0.5,
+        remove_background_speech: bool = False,
         debug_logging: bool = False,
     ) -> None:
         self._sess1 = ort.InferenceSession(model_1_path)
@@ -105,6 +106,12 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self._native_rate: int = 0
 
         self._enabled = True
+
+        # Speaker extraction for background speech removal
+        self._speaker_extractor = None
+        if remove_background_speech:
+            from .speaker_extractor import SpeakerExtractor
+            self._speaker_extractor = SpeakerExtractor(debug_logging=debug_logging)
 
         # Pre-warm ONNX Runtime's JIT compiler so the first real frame
         # doesn't stall the audio pipeline (~500ms cold-start otherwise).
@@ -220,10 +227,17 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         out_16k = self._output_queue[:n_produced]
         self._output_queue = self._output_queue[n_produced:]
 
+        # Speaker isolation: compute embedding on raw audio (better speaker
+        # characteristics), apply gain to the pure DTLN output before wet/dry
+        raw_16k = self._dry_queue[:n_produced]
+        if self._speaker_extractor is not None:
+            gain = self._speaker_extractor.process_block(raw_16k)
+            out_16k = out_16k * gain
+            raw_16k = raw_16k * gain  # also attenuate the dry signal
+
         # Wet/dry blend: mix denoised with original to prevent over-suppression
         if self._strength < 1.0:
-            dry_16k = self._dry_queue[:n_produced]
-            out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k
+            out_16k = self._strength * out_16k + (1.0 - self._strength) * raw_16k
         self._dry_queue = self._dry_queue[n_produced:]
 
         # Build 16 kHz AudioFrame and upsample back to native rate
