@@ -30,13 +30,38 @@ _DEFAULT_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 
 # High-frequency rolloff to prevent metallic artifacts from spectral masking.
 # DTLN's spectral mask can leave high frequencies untouched while heavily
-# suppressing low/mid, creating an unnatural thin sound. This precomputed
-# filter gently attenuates 4-8 kHz on the 512-sample block (257 rfft bins).
-_HF_ROLLOFF_FREQ = np.fft.rfftfreq(_BLOCK_LEN, d=1.0 / _SAMPLE_RATE)
-_HF_ROLLOFF = np.where(
-    _HF_ROLLOFF_FREQ <= 4000, 1.0,
-    np.maximum(0.1, 1.0 - (_HF_ROLLOFF_FREQ - 4000) / 4000),
+# suppressing low/mid, creating an unnatural thin sound.
+_HF_ROLLOFF_WIN = 2048
+_HF_ROLLOFF_HOP = _HF_ROLLOFF_WIN // 2
+_HF_ROLLOFF_HANN = np.hanning(_HF_ROLLOFF_WIN).astype(np.float32)
+_HF_ROLLOFF_FREQS = np.fft.rfftfreq(_HF_ROLLOFF_WIN, d=1.0 / _SAMPLE_RATE)
+_HF_ROLLOFF_CURVE = np.where(
+    _HF_ROLLOFF_FREQS <= 4000, 1.0,
+    np.maximum(0.1, 1.0 - (_HF_ROLLOFF_FREQS - 4000) / 4000),
 ).astype(np.float32)
+
+
+def _apply_hf_rolloff(samples: np.ndarray) -> np.ndarray:
+    """Apply gentle high-frequency rolloff via overlap-add windowed FFT."""
+    n = len(samples)
+    if n < _HF_ROLLOFF_WIN:
+        # Too short for windowed processing — apply directly
+        spec = np.fft.rfft(samples, n=max(n, 256))
+        freqs = np.fft.rfftfreq(max(n, 256), d=1.0 / _SAMPLE_RATE)
+        curve = np.where(freqs <= 4000, 1.0, np.maximum(0.1, 1.0 - (freqs - 4000) / 4000))
+        return np.fft.irfft(spec * curve, n=max(n, 256))[:n].astype(np.float32)
+
+    output = np.zeros(n, dtype=np.float64)
+    weight = np.zeros(n, dtype=np.float64)
+    for i in range(0, n - _HF_ROLLOFF_WIN, _HF_ROLLOFF_HOP):
+        chunk = samples[i:i + _HF_ROLLOFF_WIN].astype(np.float64) * _HF_ROLLOFF_HANN
+        spec = np.fft.rfft(chunk)
+        filtered = np.fft.irfft(spec * _HF_ROLLOFF_CURVE, n=_HF_ROLLOFF_WIN)
+        output[i:i + _HF_ROLLOFF_WIN] += filtered * _HF_ROLLOFF_HANN
+        weight[i:i + _HF_ROLLOFF_WIN] += _HF_ROLLOFF_HANN ** 2
+    weight[weight == 0] = 1.0
+    output /= weight
+    return output.astype(np.float32)
 
 _DTLN_BASE_URL = "https://github.com/breizhn/DTLN/raw/master/pretrained_model"
 _MODEL_FILES = ["model_1.onnx", "model_2.onnx"]
@@ -237,6 +262,11 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         out_16k = self._output_queue[:n_produced]
         self._output_queue = self._output_queue[n_produced:]
 
+        # High-frequency rolloff: apply in frequency domain to the output
+        # chunk to prevent metallic artifacts from DTLN spectral masking.
+        # Uses an overlap-add pass matching the demo generation script.
+        out_16k = _apply_hf_rolloff(out_16k)
+
         # Speaker isolation: compute embedding on raw audio (better speaker
         # characteristics), apply gain to the pure DTLN output before wet/dry
         raw_16k = self._dry_queue[:n_produced]
@@ -328,10 +358,6 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         })
         denoised = out2[0].reshape(_BLOCK_LEN)  # (512,)
         self._state2 = out2[1]
-
-        # Apply high-frequency rolloff to prevent metallic artifacts
-        denoised_spec = np.fft.rfft(denoised)
-        denoised = np.fft.irfft(denoised_spec * _HF_ROLLOFF, n=_BLOCK_LEN).astype(np.float32)
 
         if self._debug_logging and self._debug_frame_count % 100 == 0:
             logger.debug(
