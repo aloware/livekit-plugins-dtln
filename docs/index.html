@@ -72,6 +72,7 @@
 
     --col-original: #6b7280;
     --col-dtln: #3b82f6;
+    --col-dtln-spk: #f59e0b;
     --col-krisp: #22c55e;
     --col-bvc: #a855f7;
     --col-quail-l: #22c55e;
@@ -243,6 +244,7 @@
   }
 
   .badge-dtln { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .badge-new  { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
   .badge-ref  { background: rgba(100,116,139,0.12); color: var(--muted); border: 1px solid var(--border); }
 
   main {
@@ -282,12 +284,13 @@
   .columns-2 { grid-template-columns: repeat(2, 1fr); }
   .columns-3 { grid-template-columns: repeat(3, 1fr); }
   .columns-4 { grid-template-columns: repeat(4, 1fr); }
+  .columns-5 { grid-template-columns: repeat(5, 1fr); }
 
   @media (max-width: 900px) {
-    .columns-3, .columns-4 { grid-template-columns: repeat(2, 1fr); }
+    .columns-3, .columns-4, .columns-5 { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 600px) {
-    .columns-2, .columns-3, .columns-4 { grid-template-columns: 1fr; }
+    .columns-2, .columns-3, .columns-4, .columns-5 { grid-template-columns: 1fr; }
     main { padding: 1.5rem 1rem; }
     header { padding: 1.5rem 1rem 1rem; }
   }
@@ -375,6 +378,7 @@
     width: 14px;
     height: 14px;
     fill: white;
+    margin-left: 2px;
   }
 
   .progress-time {
@@ -483,6 +487,60 @@
   }
 
   .tooltip-wrap:hover .tooltip-box { display: block; }
+
+  .transcript {
+    padding: 0.65rem 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .transcript strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .transcript del {
+    color: #ef4444;
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+
+  .wer-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-top: 1rem;
+  }
+
+  .wer-table th, .wer-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wer-table th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .wer-table td { color: var(--text); }
+
+  .wer-good { color: var(--green) !important; }
+  .wer-ok { color: var(--yellow) !important; }
+  .wer-bad { color: #ef4444 !important; }
+
+  .section-note {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 0.75rem;
+    line-height: 1.6;
+    font-style: italic;
+  }
 </style>
 </head>
 <body>
@@ -524,70 +582,59 @@
   <h2>Audio Comparison</h2>
   <p>
     Same source audio as <a href="https://docs.livekit.io/transport/media/noise-cancellation/" style="color:var(--accent)">LiveKit's noise cancellation page</a>.
-    DTLN (ours) runs in-process via ONNX Runtime. Reference tracks stream from LiveKit's CDN.
+    Play the samples below to hear DTLN against Krisp and AI-coustics.
   </p>
 </header>
 
 <main>
 
   <!-- ================================================================ -->
-  <!-- Sample 1: Coffee shop                                             -->
+  <!-- Section 1: Coffee Shop Noise                                      -->
   <!-- ================================================================ -->
   <section class="sample-section">
     <div class="sample-header">
       <h2>☕ Coffee Shop Noise</h2>
-      <p>Ambient café noise mixed with speech. Source: LiveKit / Krisp demo.</p>
+      <p>Ambient café noise mixed with speech. All three produce identical transcripts. Transcripts by Deepgram Nova 3.</p>
     </div>
-    <div class="columns columns-3">
-      <div class="audio-card" id="card-krisp-orig">
+    <div class="columns columns-2">
+      <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-original)"></span>
-            Original
-          </div>
-          <span class="card-duration" id="dur-krisp-orig">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-original)"></span> Original</div>
+          <span class="card-duration" id="dur-cs-orig">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-krisp-orig"></div></div>
+        <div class="waveform-wrap"><div id="wave-cs-orig"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-krisp-orig" style="background:var(--col-original)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-krisp-orig">0:00</span>
+          <button class="play-btn" id="play-cs-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-cs-orig">0:00</span>
         </div>
+        <div class="transcript">Hey there, can you hear me alright? I've got the windows open and the traffic can get pretty noisy around this time.</div>
       </div>
-
-      <div class="audio-card" id="card-krisp-dtln">
+      <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-dtln)"></span>
-            DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span>
-          </div>
-          <span class="card-duration" id="dur-krisp-dtln">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-dtln)"></span> DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span></div>
+          <span class="card-duration" id="dur-cs-dtln">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-krisp-dtln"></div></div>
+        <div class="waveform-wrap"><div id="wave-cs-dtln"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-krisp-dtln" style="background:var(--col-dtln)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-krisp-dtln">0:00</span>
+          <button class="play-btn" id="play-cs-dtln" style="background:var(--col-dtln)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-cs-dtln">0:00</span>
         </div>
+        <div class="transcript">Hey there, can you hear me alright? I've got the windows open and the traffic can get pretty noisy around this time.</div>
       </div>
-
-      <div class="audio-card" id="card-krisp-ref">
+    </div>
+    <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
+    <div class="columns columns-2">
+      <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-krisp)"></span>
-            Krisp <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
-          </div>
-          <span class="card-duration" id="dur-krisp-ref">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-krisp)"></span> Krisp <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
+          <span class="card-duration" id="dur-cs-krisp">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-krisp-ref"></div></div>
+        <div class="waveform-wrap"><div id="wave-cs-krisp"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-krisp-ref" style="background:var(--col-krisp)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-krisp-ref">0:00</span>
+          <button class="play-btn" id="play-cs-krisp" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-cs-krisp">0:00</span>
         </div>
+        <div class="transcript">Hey there, can you hear me alright? I've got the windows open and the traffic can get pretty noisy around this time.</div>
       </div>
     </div>
   </section>
@@ -595,80 +642,64 @@
   <hr class="divider">
 
   <!-- ================================================================ -->
-  <!-- Sample 2: Taxi                                                    -->
+  <!-- Section 2: Taxi Ride                                              -->
   <!-- ================================================================ -->
   <section class="sample-section">
     <div class="sample-header">
       <h2>🚕 Taxi Ride</h2>
-      <p>Road and engine noise during a phone call. Source: LiveKit / Krisp demo.</p>
+      <p>Road and engine noise during a phone call. <del style="color:#ef4444">Strikethrough</del> indicates STT errors caused by background noise. Transcripts by Deepgram Nova 3.</p>
     </div>
-    <div class="columns columns-4">
+    <div class="columns columns-2">
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-original)"></span>
-            Original
-          </div>
-          <span class="card-duration" id="dur-taxi-orig">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-original)"></span> Original</div>
+          <span class="card-duration" id="dur-tx-orig">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-taxi-orig"></div></div>
+        <div class="waveform-wrap"><div id="wave-tx-orig"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-taxi-orig" style="background:var(--col-original)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-taxi-orig">0:00</span>
+          <button class="play-btn" id="play-tx-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-tx-orig">0:00</span>
         </div>
+        <div class="transcript">Hi there, can you hear me alright? <del>Pretty bad.</del> Sorry, it's pretty noisy in the taxi. <del>Sorry, I'll get you there for the second.</del> Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
-
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-dtln)"></span>
-            DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span>
-          </div>
-          <span class="card-duration" id="dur-taxi-dtln">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-dtln)"></span> DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span></div>
+          <span class="card-duration" id="dur-tx-dtln">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-taxi-dtln"></div></div>
+        <div class="waveform-wrap"><div id="wave-tx-dtln"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-taxi-dtln" style="background:var(--col-dtln)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-taxi-dtln">0:00</span>
+          <button class="play-btn" id="play-tx-dtln" style="background:var(--col-dtln)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-tx-dtln">0:00</span>
         </div>
+        <div class="transcript">Hi there, can you hear me alright? Sorry, it's pretty noisy in the taxi. <del>Sorry, I'll get you there pretty soon.</del> Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
-
+    </div>
+    <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
+    <div class="columns columns-2">
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-krisp)"></span>
-            Krisp NC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
-          </div>
-          <span class="card-duration" id="dur-taxi-nc">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-krisp)"></span> Krisp NC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
+          <span class="card-duration" id="dur-tx-knc">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-taxi-nc"></div></div>
+        <div class="waveform-wrap"><div id="wave-tx-knc"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-taxi-nc" style="background:var(--col-krisp)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-taxi-nc">0:00</span>
+          <button class="play-btn" id="play-tx-knc" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-tx-knc">0:00</span>
         </div>
+        <div class="transcript">Hi there, <del>can</del> hear me alright? <del>Pretty bad.</del> Sorry, it's pretty noisy in the taxi. <del>No,</del> I'll get you there pretty soon. Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
-
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-bvc)"></span>
-            Krisp BVC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
-          </div>
-          <span class="card-duration" id="dur-taxi-bvc">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-bvc)"></span> Krisp BVC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
+          <span class="card-duration" id="dur-tx-bvc">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-taxi-bvc"></div></div>
+        <div class="waveform-wrap"><div id="wave-tx-bvc"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-taxi-bvc" style="background:var(--col-bvc)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-taxi-bvc">0:00</span>
+          <button class="play-btn" id="play-tx-bvc" style="background:var(--col-bvc)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-tx-bvc">0:00</span>
         </div>
+        <div class="transcript">Hi there, can you hear me alright? Sorry, it's pretty noisy in the taxi. Okay, so as I was saying, I just heard about this platform called LiveKit. It's an all-in-one platform for voice AI agents with some pretty cool features. Have you heard about it?</div>
       </div>
     </div>
   </section>
@@ -676,80 +707,64 @@
   <hr class="divider">
 
   <!-- ================================================================ -->
-  <!-- Sample 3: Conversation                                            -->
+  <!-- Section 3: Background Noise Suppression — gym sample              -->
   <!-- ================================================================ -->
   <section class="sample-section">
     <div class="sample-header">
-      <h2>🗣️ Conversation with Background Noise</h2>
-      <p>Speech with mixed background noise. Source: LiveKit / AI-coustics demo.</p>
+      <h2>🔇 Background Noise Suppression</h2>
+      <p>Listen to the same gym membership sample with original audio, Krisp NC, ai-coustics Quail (QUAIL_L), and DTLN. Segments marked with <del style="color:#ef4444">strikethrough</del> indicate hallucinated or incorrect words caused by background audio. Transcripts by Deepgram Nova 3.</p>
     </div>
-    <div class="columns columns-4">
+    <div class="columns columns-2">
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-original)"></span>
-            Original
-          </div>
-          <span class="card-duration" id="dur-np-orig">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-original)"></span> Original</div>
+          <span class="card-duration" id="dur-ns-orig">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-np-orig"></div></div>
+        <div class="waveform-wrap"><div id="wave-ns-orig"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-np-orig" style="background:var(--col-original)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-np-orig">0:00</span>
+          <button class="play-btn" id="play-ns-orig" style="background:var(--col-original)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-ns-orig">0:00</span>
         </div>
+        <div class="transcript"><del>Can I get you the</del> How peaceful <del>Okay? Did you catch the halftime show? I think about that it was a Spanish</del> Yes. I've just received an email that my gym membership is canceled.</div>
       </div>
-
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-dtln)"></span>
-            DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span>
-          </div>
-          <span class="card-duration" id="dur-np-dtln">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-dtln)"></span> DTLN <span class="badge badge-dtln" style="font-size:0.65rem;padding:0.1rem 0.4rem">ours</span></div>
+          <span class="card-duration" id="dur-ns-dtln">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-np-dtln"></div></div>
+        <div class="waveform-wrap"><div id="wave-ns-dtln"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-np-dtln" style="background:var(--col-dtln)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-np-dtln">0:00</span>
+          <button class="play-btn" id="play-ns-dtln" style="background:var(--col-dtln)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-ns-dtln">0:00</span>
         </div>
+        <div class="transcript"><del>Oh peaceful okay luckily no one was there did you catch the halftime show i think monday was this there's no</del> Yes. I just received an email that my gym membership is canceled.</div>
       </div>
-
+    </div>
+    <p style="color:var(--muted);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem;margin-bottom:0.5rem">Competitors</p>
+    <div class="columns columns-2">
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-quail-l)"></span>
-            AI-coustics QUAIL_L <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
-          </div>
-          <span class="card-duration" id="dur-np-ql">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-krisp)"></span> Krisp NC <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
+          <span class="card-duration" id="dur-ns-knc">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-np-ql"></div></div>
+        <div class="waveform-wrap"><div id="wave-ns-knc"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-np-ql" style="background:var(--col-quail-l)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-np-ql">0:00</span>
+          <button class="play-btn" id="play-ns-knc" style="background:var(--col-krisp)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-ns-knc">0:00</span>
         </div>
+        <div class="transcript"><del>Oh, peaceful.</del> Okay. <del>That's an off time show?</del> I just received an email that my gym membership is canceled.</div>
       </div>
-
       <div class="audio-card">
         <div class="card-label">
-          <div class="card-label-text">
-            <span class="color-dot" style="background:var(--col-quail-vf)"></span>
-            AI-coustics QUAIL_VF_L <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">reference</span>
-          </div>
-          <span class="card-duration" id="dur-np-qvf">—</span>
+          <div class="card-label-text"><span class="color-dot" style="background:var(--col-bvc)"></span> AI-coustics QUAIL_L <span class="badge badge-ref" style="font-size:0.65rem;padding:0.1rem 0.4rem">LiveKit Cloud</span></div>
+          <span class="card-duration" id="dur-ns-ql">—</span>
         </div>
-        <div class="waveform-wrap"><div id="wave-np-qvf"></div></div>
+        <div class="waveform-wrap"><div id="wave-ns-ql"></div></div>
         <div class="card-controls">
-          <button class="play-btn" id="play-np-qvf" style="background:var(--col-quail-vf)">
-            <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-          </button>
-          <span class="progress-time" id="time-np-qvf">0:00</span>
+          <button class="play-btn" id="play-ns-ql" style="background:var(--col-bvc)"><svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg></button>
+          <span class="progress-time" id="time-ns-ql">0:00</span>
         </div>
+        <div class="transcript">How peaceful? Okay. <del>I buy that with</del> Yes. I've just received an email that my gym membership is canceled.</div>
       </div>
     </div>
   </section>
@@ -775,14 +790,13 @@
 // ---------------------------------------------------------------------------
 // Track definitions
 // ---------------------------------------------------------------------------
-const LIVEKIT_CDN = 'https://docs.livekit.io/audio';
-
 // Each track has explicit hex colors so we can derive dim/bright variants:
 //   waveColor    = unplayed portion (dim)
 //   progressColor = played portion (full brightness)
 const C = {
   original: { wave: '#3d4049', progress: '#9ca3af', cursor: '#d1d5db' },
   dtln:     { wave: '#1e3a5f', progress: '#3b82f6', cursor: '#60a5fa' },
+  dtlnSpk:  { wave: '#4a3000', progress: '#f59e0b', cursor: '#fbbf24' },
   krisp:    { wave: '#14432a', progress: '#22c55e', cursor: '#4ade80' },
   bvc:      { wave: '#3b1f5e', progress: '#a855f7', cursor: '#c084fc' },
   quailL:   { wave: '#14432a', progress: '#22c55e', cursor: '#4ade80' },
@@ -790,33 +804,33 @@ const C = {
 };
 
 const tracks = [
-  // Sample 1 — Coffee shop
-  { waveId: 'wave-krisp-orig', playId: 'play-krisp-orig', timeId: 'time-krisp-orig', durId: 'dur-krisp-orig',
+  // Section 1 — Coffee Shop Noise
+  { waveId: 'wave-cs-orig',  playId: 'play-cs-orig',  timeId: 'time-cs-orig',  durId: 'dur-cs-orig',
     url: 'audio/originals/krisp-original.mp3', c: C.original },
-  { waveId: 'wave-krisp-dtln', playId: 'play-krisp-dtln', timeId: 'time-krisp-dtln', durId: 'dur-krisp-dtln',
+  { waveId: 'wave-cs-dtln',  playId: 'play-cs-dtln',  timeId: 'time-cs-dtln',  durId: 'dur-cs-dtln',
     url: 'audio/dtln-krisp-original.wav', c: C.dtln },
-  { waveId: 'wave-krisp-ref',  playId: 'play-krisp-ref',  timeId: 'time-krisp-ref',  durId: 'dur-krisp-ref',
-    url: `${LIVEKIT_CDN}/krisp-processed.mp3`, c: C.krisp },
+  { waveId: 'wave-cs-krisp', playId: 'play-cs-krisp', timeId: 'time-cs-krisp', durId: 'dur-cs-krisp',
+    url: 'audio/competitors/krisp-processed.mp3', c: C.krisp },
 
-  // Sample 2 — Taxi
-  { waveId: 'wave-taxi-orig', playId: 'play-taxi-orig', timeId: 'time-taxi-orig', durId: 'dur-taxi-orig',
+  // Section 2 — Taxi Ride
+  { waveId: 'wave-tx-orig',  playId: 'play-tx-orig',  timeId: 'time-tx-orig',  durId: 'dur-tx-orig',
     url: 'audio/originals/taxi-sample.mp3', c: C.original },
-  { waveId: 'wave-taxi-dtln', playId: 'play-taxi-dtln', timeId: 'time-taxi-dtln', durId: 'dur-taxi-dtln',
+  { waveId: 'wave-tx-dtln',  playId: 'play-tx-dtln',  timeId: 'time-tx-dtln',  durId: 'dur-tx-dtln',
     url: 'audio/dtln-taxi-sample.wav', c: C.dtln },
-  { waveId: 'wave-taxi-nc',   playId: 'play-taxi-nc',   timeId: 'time-taxi-nc',   durId: 'dur-taxi-nc',
-    url: `${LIVEKIT_CDN}/taxi-sample-nc-processed.mp3`, c: C.krisp },
-  { waveId: 'wave-taxi-bvc',  playId: 'play-taxi-bvc',  timeId: 'time-taxi-bvc',  durId: 'dur-taxi-bvc',
-    url: `${LIVEKIT_CDN}/taxi-sample-bvc-processed.mp3`, c: C.bvc },
+  { waveId: 'wave-tx-knc',   playId: 'play-tx-knc',   timeId: 'time-tx-knc',   durId: 'dur-tx-knc',
+    url: 'audio/competitors/taxi-sample-nc-processed.mp3', c: C.krisp },
+  { waveId: 'wave-tx-bvc',   playId: 'play-tx-bvc',   timeId: 'time-tx-bvc',   durId: 'dur-tx-bvc',
+    url: 'audio/competitors/taxi-sample-bvc-processed.mp3', c: C.bvc },
 
-  // Sample 3 — Conversation
-  { waveId: 'wave-np-orig', playId: 'play-np-orig', timeId: 'time-np-orig', durId: 'dur-np-orig',
-    url: 'audio/originals/noproblem_raw.wav', c: C.original },
-  { waveId: 'wave-np-dtln', playId: 'play-np-dtln', timeId: 'time-np-dtln', durId: 'dur-np-dtln',
-    url: 'audio/dtln-noproblem.wav', c: C.dtln },
-  { waveId: 'wave-np-ql',   playId: 'play-np-ql',   timeId: 'time-np-ql',   durId: 'dur-np-ql',
-    url: `${LIVEKIT_CDN}/noproblem-quail_l-processed.wav`, c: C.quailL },
-  { waveId: 'wave-np-qvf',  playId: 'play-np-qvf',  timeId: 'time-np-qvf',  durId: 'dur-np-qvf',
-    url: `${LIVEKIT_CDN}/noproblem-quail_vf_l-processed.wav`, c: C.quailVF },
+  // Section 3 — Background Noise Suppression (gym sample)
+  { waveId: 'wave-ns-orig',  playId: 'play-ns-orig',  timeId: 'time-ns-orig',  durId: 'dur-ns-orig',
+    url: 'audio/originals/gym.wav', c: C.original },
+  { waveId: 'wave-ns-knc',   playId: 'play-ns-knc',   timeId: 'time-ns-knc',   durId: 'dur-ns-knc',
+    url: 'audio/competitors/gym-krisp-nc.wav', c: C.krisp },
+  { waveId: 'wave-ns-ql',    playId: 'play-ns-ql',    timeId: 'time-ns-ql',    durId: 'dur-ns-ql',
+    url: 'audio/competitors/gym-quail-l.wav', c: C.bvc },
+  { waveId: 'wave-ns-dtln',  playId: 'play-ns-dtln',  timeId: 'time-ns-dtln',  durId: 'dur-ns-dtln',
+    url: 'audio/dtln-gym.wav', c: C.dtln },
 ];
 
 // ---------------------------------------------------------------------------

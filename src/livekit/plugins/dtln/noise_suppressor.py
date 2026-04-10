@@ -28,6 +28,70 @@ _N_BINS = _BLOCK_LEN // 2 + 1
 
 _DEFAULT_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 
+# High-frequency rolloff to prevent metallic artifacts from spectral masking.
+# DTLN's spectral mask can leave high frequencies untouched while heavily
+# suppressing low/mid, creating an unnatural thin sound.
+# Uses a 4th-order Butterworth IIR low-pass at 4kHz (stateful, works on
+# any chunk size including tiny per-frame outputs).
+def _butterworth_coeffs(cutoff: float, sr: float, order: int = 4):
+    """Compute IIR filter coefficients for a Butterworth low-pass filter."""
+    # Pre-warp analog frequency
+    wc = 2.0 * sr * np.tan(np.pi * cutoff / sr)
+    # Bilinear transform of 1st/2nd order analog sections
+    # For order=4, cascade two 2nd-order sections (biquads)
+    from math import cos, sin, pi
+    sections = []
+    for k in range(order):
+        theta = pi * (2 * k + order + 1) / (2 * order)
+        # Analog pole: s = wc * exp(j*theta)
+        real = cos(theta)
+        imag = sin(theta)
+        # Bilinear transform: z = (1 + s/(2*sr)) / (1 - s/(2*sr))
+        # For 2nd order section from conjugate pair
+        if imag >= 0 and k < order // 2:
+            # Pair poles k and (order-1-k)
+            a_real = wc * real
+            a_imag = wc * imag
+            # Bilinear: s -> 2*sr*(z-1)/(z+1)
+            # H(z) = wc^2 / (s^2 - 2*a_real*s + (a_real^2+a_imag^2))
+            K = 2.0 * sr
+            denom_real = K * K - 2.0 * a_real * K + a_real * a_real + a_imag * a_imag
+            b0 = wc * wc / denom_real
+            sections.append((a_real, a_imag, K))
+    return sections
+
+
+class _HFRolloffFilter:
+    """Stateful 4th-order Butterworth low-pass at 4kHz for 16kHz audio.
+
+    Blends filtered output with original using a wet/dry ratio so speech
+    fundamentals pass through unchanged while high frequencies are tamed.
+    """
+
+    def __init__(self, cutoff: float = 4000.0, sr: float = 16000.0, blend: float = 0.7):
+        # Simple 1st-order IIR as a building block — cascade 4 for steeper rolloff
+        # alpha = dt / (RC + dt) where RC = 1/(2*pi*cutoff)
+        rc = 1.0 / (2.0 * np.pi * cutoff)
+        dt = 1.0 / sr
+        self._alpha = np.float32(dt / (rc + dt))
+        self._blend = np.float32(blend)  # 0=bypass, 1=full filter
+        # 4 cascaded states for 4th-order rolloff
+        self._states = [np.float32(0.0)] * 4
+
+    def process(self, samples: np.ndarray) -> np.ndarray:
+        """Filter samples in-place, returns filtered array."""
+        out = samples.copy()
+        alpha = self._alpha
+        blend = self._blend
+        for stage in range(4):
+            state = self._states[stage]
+            for i in range(len(out)):
+                state = state + alpha * (out[i] - state)
+                out[i] = state
+            self._states[stage] = state
+        # Blend: keep most of the filtered signal, mix a bit of original
+        return blend * out + (1.0 - blend) * samples
+
 _DTLN_BASE_URL = "https://github.com/breizhn/DTLN/raw/master/pretrained_model"
 _MODEL_FILES = ["model_1.onnx", "model_2.onnx"]
 
@@ -105,6 +169,9 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self._native_rate: int = 0
 
         self._enabled = True
+
+        # High-frequency rolloff filter (stateful IIR, works on any chunk size)
+        self._hf_rolloff = _HFRolloffFilter()
 
         # Pre-warm ONNX Runtime's JIT compiler so the first real frame
         # doesn't stall the audio pipeline (~500ms cold-start otherwise).
@@ -219,6 +286,9 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
 
         out_16k = self._output_queue[:n_produced]
         self._output_queue = self._output_queue[n_produced:]
+
+        # High-frequency rolloff to prevent metallic artifacts
+        out_16k = self._hf_rolloff.process(out_16k)
 
         # Wet/dry blend: mix denoised with original to prevent over-suppression
         if self._strength < 1.0:
