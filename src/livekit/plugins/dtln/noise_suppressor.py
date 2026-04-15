@@ -255,8 +255,7 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self._input_queue = np.concatenate([self._input_queue, samples_16k])
         self._dry_queue = np.concatenate([self._dry_queue, samples_16k])
 
-        # Process in BLOCK_SHIFT (128-sample) steps; count steps taken.
-        n_steps = 0
+        # Process in BLOCK_SHIFT (128-sample) steps.
         while len(self._input_queue) >= _BLOCK_SHIFT:
             new = self._input_queue[:_BLOCK_SHIFT]
             self._input_queue = self._input_queue[_BLOCK_SHIFT:]
@@ -273,28 +272,27 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
             self._output_queue = np.concatenate([
                 self._output_queue, self._out_buf[:_BLOCK_SHIFT]
             ])
-            n_steps += 1
 
-        # Drain exactly what we produced this step — no more, no less.
-        # This eliminates the periodic silence that occurs when draining by
-        # n_16k (downsampler output) instead of n_steps * _BLOCK_SHIFT.
-        # During startup the output_queue fills with pipeline latency (~24ms);
-        # in steady state it stays constant.
-        n_produced = n_steps * _BLOCK_SHIFT
-        if n_produced == 0:
-            return frame
+        # Drain the same number of samples that went IN, not what the block
+        # loop produced.  When the frame size isn't a multiple of BLOCK_SHIFT
+        # the two counts diverge, causing pad/truncate artifacts downstream.
+        # The output queue builds up during the first ~24ms of pipeline latency
+        # (BLOCK_LEN - BLOCK_SHIFT = 384 samples), then stays in sync.
+        n_16k = len(samples_16k)
+        if len(self._output_queue) < n_16k:
+            return frame  # still filling up during startup latency
 
-        out_16k = self._output_queue[:n_produced]
-        self._output_queue = self._output_queue[n_produced:]
+        out_16k = self._output_queue[:n_16k]
+        self._output_queue = self._output_queue[n_16k:]
 
         # High-frequency rolloff to prevent metallic artifacts
         out_16k = self._hf_rolloff.process(out_16k)
 
         # Wet/dry blend: mix denoised with original to prevent over-suppression
         if self._strength < 1.0:
-            dry_16k = self._dry_queue[:n_produced]
+            dry_16k = self._dry_queue[:n_16k]
             out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k
-        self._dry_queue = self._dry_queue[n_produced:]
+        self._dry_queue = self._dry_queue[n_16k:]
 
         # Build 16 kHz AudioFrame and upsample back to native rate
         out_int16_16k = (np.clip(out_16k, -1.0, 1.0) * 32767.0).astype(np.int16)
