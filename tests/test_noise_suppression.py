@@ -108,6 +108,81 @@ def test_file(name: str, min_reduction_pct: int) -> bool:
             os.unlink(tmp_wav)
 
 
+def longest_zero_run(samples: np.ndarray) -> int:
+    """Return the length of the longest contiguous run of exact-zero samples."""
+    is_zero = (samples == 0)
+    if not np.any(is_zero):
+        return 0
+    # Count consecutive zeros using a run-length approach
+    longest = current = 0
+    for v in is_zero:
+        if v:
+            current += 1
+            if current > longest:
+                longest = current
+        else:
+            current = 0
+    return longest
+
+
+def test_non_aligned_frame_sizes() -> bool:
+    """Regression test: non-aligned frame sizes must not produce silence gaps.
+
+    Frame sizes that aren't multiples of BLOCK_SHIFT (128) at 16kHz — e.g.
+    10ms (160), 20ms (320), 30ms (480) — previously triggered pad/truncate
+    logic that appended zeros or dropped samples every other frame, causing
+    audible crackling. The symptom was contiguous runs of zero samples
+    (~32-96 samples long) embedded in the output stream.
+
+    This test feeds continuous white noise through _process() and verifies
+    the concatenated output contains no long zero-runs. Real denoised audio
+    over a non-silent input cannot produce extended runs of exact zeros,
+    so any such run is a pad/truncate regression.
+    """
+    sample_rate = 16000
+    n_frames = 100
+    startup_frames = 4  # skip pipeline-latency transient (~24ms)
+    # Max plausible zero-run in genuine denoised output of a continuous
+    # signal. The bug produces runs of 32-96 samples; set threshold safely
+    # below that.
+    max_allowed_zero_run = 16
+    rng = np.random.default_rng(seed=42)
+
+    all_ok = True
+    for chunk_ms in (10, 20, 30):
+        chunk_size = sample_rate * chunk_ms // 1000
+        signal = (rng.standard_normal(chunk_size * n_frames) * 0.3 * 32767).astype(np.int16)
+
+        ns = DTLNNoiseSuppressor()
+        out_frames = []
+        for i in range(n_frames):
+            chunk = signal[i * chunk_size : (i + 1) * chunk_size]
+            frame = rtc.AudioFrame(
+                data=chunk.tobytes(),
+                sample_rate=sample_rate,
+                num_channels=1,
+                samples_per_channel=chunk_size,
+            )
+            out_frame = ns._process(frame)
+            out_frames.append(np.frombuffer(out_frame.data, dtype=np.int16))
+
+        # Concatenate the steady-state portion (skip startup transient)
+        steady = np.concatenate(out_frames[startup_frames:])
+        zero_run = longest_zero_run(steady)
+
+        print(f"  {chunk_ms}ms frames ({chunk_size} samples):")
+        print(f"    frames processed: {n_frames} (skipped startup: {startup_frames})")
+        print(f"    longest zero-run: {zero_run} samples (threshold: {max_allowed_zero_run})")
+
+        if zero_run > max_allowed_zero_run:
+            print(f"    FAIL: zero-run exceeds threshold — pad/truncate regression")
+            all_ok = False
+        else:
+            print(f"    PASS")
+
+    return all_ok
+
+
 def main():
     print("DTLN Noise Suppression — Integration Test")
     print("=" * 50)
@@ -115,6 +190,10 @@ def main():
     results = []
     for name, threshold in TEST_FILES.items():
         results.append(test_file(name, threshold))
+
+    print()
+    print("Frame-alignment regression test:")
+    results.append(test_non_aligned_frame_sizes())
 
     print()
     passed = sum(results)
