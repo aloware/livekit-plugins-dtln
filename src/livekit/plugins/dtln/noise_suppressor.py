@@ -25,6 +25,10 @@ _BLOCK_LEN = 512
 _BLOCK_SHIFT = 128
 # rfft of 512-sample block gives 257 unique frequency bins
 _N_BINS = _BLOCK_LEN // 2 + 1
+# Overlap-add latency: a sample only leaves the synthesis buffer once the
+# window has slid past it, so the denoised (wet) signal trails the input by
+# one window minus one shift = 384 samples (24 ms at 16 kHz).
+_OVERLAP_ADD_LATENCY = _BLOCK_LEN - _BLOCK_SHIFT
 
 _DEFAULT_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 
@@ -152,9 +156,14 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self._input_queue = np.zeros(0, dtype=np.float32)
         self._output_queue = np.zeros(0, dtype=np.float32)
 
-        # Dry queue — tracks original 16 kHz samples aligned with DTLN pipeline
-        # latency so wet/dry blending stays in sync
-        self._dry_queue = np.zeros(0, dtype=np.float32)
+        # Dry queue — original 16 kHz samples kept for wet/dry blending.
+        # Pre-padded with _OVERLAP_ADD_LATENCY samples so that draining the dry
+        # and output queues by the same count also lines them up in TIME:
+        # the wet path leaves the overlap-add loop 384 samples late, so the
+        # dry path has to start 384 samples late too.  Without the padding
+        # each output sample is mixed with a 24 ms newer copy of itself,
+        # which combs the signal (~3 dB of cancellation on speech).
+        self._dry_queue = np.zeros(_OVERLAP_ADD_LATENCY, dtype=np.float32)
 
         # Wet/dry blend: 0.0 = full bypass, 1.0 = full suppression
         self._strength = max(0.0, min(1.0, strength))
@@ -276,8 +285,8 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         # Drain the same number of samples that went IN, not what the block
         # loop produced.  When the frame size isn't a multiple of BLOCK_SHIFT
         # the two counts diverge, causing pad/truncate artifacts downstream.
-        # The output queue builds up during the first ~24ms of pipeline latency
-        # (BLOCK_LEN - BLOCK_SHIFT = 384 samples), then stays in sync.
+        # The output queue builds up during the first ~24ms of overlap-add latency
+        # (_OVERLAP_ADD_LATENCY = 384 samples), then stays in sync.
         n_16k = len(samples_16k)
         if len(self._output_queue) < n_16k:
             return frame  # still filling up during startup latency
@@ -288,7 +297,9 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         # High-frequency rolloff to prevent metallic artifacts
         out_16k = self._hf_rolloff.process(out_16k)
 
-        # Wet/dry blend: mix denoised with original to prevent over-suppression
+        # Wet/dry blend: mix denoised with original to prevent over-suppression.
+        # Both queues carry the same 384-sample offset, so dry_16k is the
+        # stretch of input that produced out_16k.
         if self._strength < 1.0:
             dry_16k = self._dry_queue[:n_16k]
             out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k

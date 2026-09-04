@@ -167,9 +167,9 @@ Tested by running original audio files through `DTLNNoiseSuppressor` and measuri
 
 | File | Noise Level | RMS Reduction | Notes |
 |---|---|---|---|
-| `krisp-original.mp3` | Moderate noise | 37.1% | Active suppression |
-| `taxi-sample.mp3` | Heavy background noise | 48.6% | Strong suppression |
-| `noproblem_raw.wav` | Clean speech | 34.1% | Correctly preserves speech |
+| `krisp-original.mp3` | Moderate noise | 19.6% | Active suppression |
+| `taxi-sample.mp3` | Heavy background noise | 40.2% | Strong suppression |
+| `noproblem_raw.wav` | Clean speech | 5.6% | Correctly preserves speech |
 
 Run `python tests/test_noise_suppression.py` to reproduce.
 
