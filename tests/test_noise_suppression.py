@@ -183,6 +183,94 @@ def test_non_aligned_frame_sizes() -> bool:
     return all_ok
 
 
+def best_correlation_lag(x: np.ndarray, y: np.ndarray, max_lag: int) -> tuple[int, float]:
+    """Return (lag, r) where y[lag:] best matches x[:-lag] by correlation."""
+    x = x.astype(np.float64) - x.mean()
+    y = y.astype(np.float64) - y.mean()
+    n = min(len(x), len(y))
+    x, y = x[:n], y[:n]
+    best_lag, best_r = 0, -2.0
+    for lag in range(max_lag):
+        a, b = x[: n - lag], y[lag:n]
+        denom = np.linalg.norm(a) * np.linalg.norm(b)
+        r = 0.0 if denom == 0 else float(np.dot(a, b) / denom)
+        if r > best_r:
+            best_lag, best_r = lag, r
+    return best_lag, best_r
+
+
+def test_wet_dry_alignment() -> bool:
+    """Regression test: the wet and dry paths must line up in time before blending.
+
+    The overlap-add loop only emits a sample once the 512-sample synthesis
+    window has slid past it, so the denoised (wet) signal trails the input by
+    BLOCK_LEN - BLOCK_SHIFT = 384 samples (24ms). The dry signal used for the
+    wet/dry blend has to carry the same delay. Previously it did not: both
+    queues were drained by the same sample COUNT, which is not the same as the
+    same point in TIME, so for any 0 < strength < 1 the output was a sum of the
+    signal and a 24ms-shifted copy of itself — a comb filter, audible as echo
+    and hollowness, and costing ~3dB of level on speech.
+
+    Two checks, both on the repo's own clean-speech sample:
+
+    1. The strength=1.0 (wet only) and strength=0.0 (dry only) outputs must
+       peak-correlate at a lag near zero. A 384-sample peak means the paths
+       are offset and the blend combs.
+    2. The strength=0.5 output must keep its level. Two aligned, highly
+       correlated signals average to roughly their own amplitude; two
+       misaligned ones partially cancel.
+    """
+    sample_rate = 16000
+    chunk_size = sample_rate * 10 // 1000        # 10ms frames = 160 samples
+    duration_s = 3
+    max_lag = 1024                               # covers the 384-sample offset
+    max_allowed_offset = 8                       # HF-rolloff IIR group delay only
+    min_level_ratio = 0.90                       # of the un-cancelled average
+
+    samples, sr = read_wav_int16(os.path.join(AUDIO_DIR, "noproblem_raw.wav"))
+    assert sr == sample_rate, f"expected {sample_rate} Hz sample, got {sr}"
+    samples = samples[: sample_rate * duration_s]
+    n_frames = len(samples) // chunk_size
+
+    def run(strength: float) -> np.ndarray:
+        ns = DTLNNoiseSuppressor(strength=strength)
+        out = []
+        for i in range(n_frames):
+            chunk = np.ascontiguousarray(samples[i * chunk_size : (i + 1) * chunk_size])
+            frame = rtc.AudioFrame(
+                data=chunk.tobytes(),
+                sample_rate=sample_rate,
+                num_channels=1,
+                samples_per_channel=chunk_size,
+            )
+            out.append(np.frombuffer(ns._process(frame).data, dtype=np.int16))
+        return np.concatenate(out).astype(np.float64)
+
+    dry, wet, mix = run(0.0), run(1.0), run(0.5)
+    offset, r = best_correlation_lag(dry, wet, max_lag)
+
+    n = min(len(dry), len(wet), len(mix))
+    level_ratio = rms(mix[:n]) / ((rms(dry[:n]) + rms(wet[:n])) / 2)
+
+    print(f"  wet-vs-dry offset: {offset} samples "
+          f"({offset / sample_rate * 1000:.2f}ms, r={r:.3f}) "
+          f"(threshold: <= {max_allowed_offset})")
+    print(f"  strength=0.5 level: {level_ratio * 100:.1f}% of the dry/wet average "
+          f"(threshold: >= {min_level_ratio * 100:.0f}%)")
+
+    ok = True
+    if offset > max_allowed_offset:
+        print(f"    FAIL: wet and dry are {offset} samples apart — the blend combs")
+        ok = False
+    if level_ratio < min_level_ratio:
+        print(f"    FAIL: blended output lost "
+              f"{20 * np.log10(level_ratio):.2f}dB to comb cancellation")
+        ok = False
+    if ok:
+        print("    PASS")
+    return ok
+
+
 def main():
     print("DTLN Noise Suppression — Integration Test")
     print("=" * 50)
@@ -194,6 +282,10 @@ def main():
     print()
     print("Frame-alignment regression test:")
     results.append(test_non_aligned_frame_sizes())
+
+    print()
+    print("Wet/dry alignment regression test:")
+    results.append(test_wet_dry_alignment())
 
     print()
     passed = sum(results)
