@@ -23,6 +23,13 @@ _SAMPLE_RATE = 16_000
 # 32 ms window, 8 ms shift (75% overlap)
 _BLOCK_LEN = 512
 _BLOCK_SHIFT = 128
+
+# Denoised audio held back before the first frame is released, in 16 kHz
+# samples.  The core only emits whole 128-sample hops, and both resamplers keep
+# partial samples of their own, so the amount ready when a frame has to be
+# answered is never exactly a frame.  Holding one block covers the shortfall,
+# which turns what used to be a recurring gap into fixed startup latency.
+_PRIME_RESERVE_16K = _BLOCK_LEN
 # rfft of 512-sample block gives 257 unique frequency bins
 _N_BINS = _BLOCK_LEN // 2 + 1
 # Overlap-add latency: a sample only leaves the synthesis buffer once the
@@ -63,6 +70,16 @@ def _butterworth_coeffs(cutoff: float, sr: float, order: int = 4):
             b0 = wc * wc / denom_real
             sections.append((a_real, a_imag, K))
     return sections
+
+
+def _silent_like(frame: rtc.AudioFrame) -> rtc.AudioFrame:
+    """A frame of digital silence matching ``frame``'s shape."""
+    return rtc.AudioFrame(
+        data=b"\x00\x00" * (frame.samples_per_channel * frame.num_channels),
+        sample_rate=frame.sample_rate,
+        num_channels=frame.num_channels,
+        samples_per_channel=frame.samples_per_channel,
+    )
 
 
 class _HFRolloffFilter:
@@ -165,6 +182,15 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         # which combs the signal (~3 dB of cancellation on speech).
         self._dry_queue = np.zeros(_OVERLAP_ADD_LATENCY, dtype=np.float32)
 
+        # Denoised audio at the caller's own sample rate, waiting to be handed
+        # back.  Draining through this is what keeps the output independent of
+        # how the caller chunks the input: each call gets exactly as many
+        # samples as it gave us, and the remainder waits here for the next one
+        # instead of being zero-filled or discarded.
+        self._out_native = np.zeros(0, dtype=np.float32)
+        self._primed = False
+        self._underruns = 0
+
         # Wet/dry blend: 0.0 = full bypass, 1.0 = full suppression
         self._strength = max(0.0, min(1.0, strength))
 
@@ -253,13 +279,18 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         else:
             frames_16k = [mono_frame]
 
-        if not frames_16k:
-            return frame  # resampler buffering startup, pass through
-
-        samples_16k = np.concatenate([
-            np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
-            for f in frames_16k
-        ])
+        # An empty list is the resampler still buffering at startup.  The frame
+        # is not passed through: it has not been denoised, and splicing raw
+        # audio into a denoised stream is audible.  Fall through and let the
+        # output queue decide what to hand back.
+        samples_16k = (
+            np.concatenate([
+                np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
+                for f in frames_16k
+            ])
+            if frames_16k
+            else np.zeros(0, dtype=np.float32)
+        )
 
         self._input_queue = np.concatenate([self._input_queue, samples_16k])
         self._dry_queue = np.concatenate([self._dry_queue, samples_16k])
@@ -282,57 +313,80 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
                 self._output_queue, self._out_buf[:_BLOCK_SHIFT]
             ])
 
-        # Drain the same number of samples that went IN, not what the block
-        # loop produced.  When the frame size isn't a multiple of BLOCK_SHIFT
-        # the two counts diverge, causing pad/truncate artifacts downstream.
-        # The output queue builds up during the first ~24ms of overlap-add latency
-        # (_OVERLAP_ADD_LATENCY = 384 samples), then stays in sync.
-        n_16k = len(samples_16k)
-        if len(self._output_queue) < n_16k:
-            return frame  # still filling up during startup latency
+        # Move everything the block loop has finished into the native-rate
+        # queue.  Draining by the number of samples that went in this call
+        # keeps the 16 kHz side aligned, but it cannot by itself make the
+        # native-rate result the length of the frame, because both resamplers
+        # hold their own partial samples.  Whatever comes out is queued rather
+        # than fitted to this frame.
+        n_16k = min(len(self._output_queue), len(samples_16k))
+        if n_16k:
+            out_16k = self._output_queue[:n_16k]
+            self._output_queue = self._output_queue[n_16k:]
 
-        out_16k = self._output_queue[:n_16k]
-        self._output_queue = self._output_queue[n_16k:]
+            # High-frequency rolloff to prevent metallic artifacts
+            out_16k = self._hf_rolloff.process(out_16k)
 
-        # High-frequency rolloff to prevent metallic artifacts
-        out_16k = self._hf_rolloff.process(out_16k)
+            # Wet/dry blend: mix denoised with original to prevent over-suppression.
+            # Both queues carry the same 384-sample offset, so dry_16k is the
+            # stretch of input that produced out_16k.
+            if self._strength < 1.0:
+                dry_16k = self._dry_queue[:n_16k]
+                out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k
+            self._dry_queue = self._dry_queue[n_16k:]
 
-        # Wet/dry blend: mix denoised with original to prevent over-suppression.
-        # Both queues carry the same 384-sample offset, so dry_16k is the
-        # stretch of input that produced out_16k.
-        if self._strength < 1.0:
-            dry_16k = self._dry_queue[:n_16k]
-            out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k
-        self._dry_queue = self._dry_queue[n_16k:]
+            # Build 16 kHz AudioFrame and upsample back to native rate
+            out_int16_16k = (np.clip(out_16k, -1.0, 1.0) * 32767.0).astype(np.int16)
+            out_frame_16k = rtc.AudioFrame(
+                data=out_int16_16k.tobytes(),
+                sample_rate=_SAMPLE_RATE,
+                num_channels=1,
+                samples_per_channel=len(out_int16_16k),
+            )
 
-        # Build 16 kHz AudioFrame and upsample back to native rate
-        out_int16_16k = (np.clip(out_16k, -1.0, 1.0) * 32767.0).astype(np.int16)
-        out_frame_16k = rtc.AudioFrame(
-            data=out_int16_16k.tobytes(),
-            sample_rate=_SAMPLE_RATE,
-            num_channels=1,
-            samples_per_channel=len(out_int16_16k),
-        )
+            if self._upsampler is not None:
+                out_frames = self._upsampler.push(out_frame_16k)
+            else:
+                out_frames = [out_frame_16k]
 
-        if self._upsampler is not None:
-            out_frames = self._upsampler.push(out_frame_16k)
-        else:
-            out_frames = [out_frame_16k]
+            if out_frames:
+                self._out_native = np.concatenate([
+                    self._out_native,
+                    *(
+                        np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
+                        for f in out_frames
+                    ),
+                ])
 
-        if not out_frames:
-            return frame
-
-        out_samples = np.concatenate([
-            np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
-            for f in out_frames
-        ])
-
-        # Trim or pad to exactly match the input frame length
+        # Hand back exactly one frame's worth, taken from the queue rather than
+        # from whatever this particular call happened to finish.
         target = frame.samples_per_channel
-        if len(out_samples) > target:
-            out_samples = out_samples[:target]
-        elif len(out_samples) < target:
-            out_samples = np.pad(out_samples, (0, target - len(out_samples)))
+        if not self._primed:
+            reserve = target + int(_PRIME_RESERVE_16K * self._resample_ratio())
+            if len(self._out_native) < reserve:
+                # Still filling.  Emit silence rather than the raw frame: the
+                # caller's audio has not been denoised yet, and splicing it in
+                # is both audible and a privacy surprise for a suppressor.
+                return _silent_like(frame)
+            self._primed = True
+
+        if len(self._out_native) < target:
+            # Should not happen once primed.  Pad rather than drop the frame,
+            # and say so, because a recurring underrun means the reserve is
+            # sized wrong for this rate.
+            self._underruns += 1
+            if self._underruns in (1, 10, 100, 1000):
+                logger.warning(
+                    "DTLN output underrun (%d so far): have %d samples, need %d",
+                    self._underruns,
+                    len(self._out_native),
+                    target,
+                )
+            out_samples = np.pad(self._out_native, (0, target - len(self._out_native)))
+            self._out_native = np.zeros(0, dtype=np.float32)
+        else:
+            out_samples = self._out_native[:target]
+            self._out_native = self._out_native[target:]
 
         # Restore original channel count (duplicate mono → stereo if needed)
         if frame.num_channels > 1:
@@ -345,6 +399,10 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
             num_channels=frame.num_channels,
             samples_per_channel=frame.samples_per_channel,
         )
+
+    def _resample_ratio(self) -> float:
+        """Native samples per 16 kHz sample, for sizing the reserve."""
+        return (self._native_rate / _SAMPLE_RATE) if self._native_rate else 1.0
 
     def _close(self) -> None:
         self._enabled = False
