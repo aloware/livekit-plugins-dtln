@@ -39,39 +39,6 @@ _OVERLAP_ADD_LATENCY = _BLOCK_LEN - _BLOCK_SHIFT
 
 _DEFAULT_MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 
-# High-frequency rolloff to prevent metallic artifacts from spectral masking.
-# DTLN's spectral mask can leave high frequencies untouched while heavily
-# suppressing low/mid, creating an unnatural thin sound.
-# Uses a 4th-order Butterworth IIR low-pass at 4kHz (stateful, works on
-# any chunk size including tiny per-frame outputs).
-def _butterworth_coeffs(cutoff: float, sr: float, order: int = 4):
-    """Compute IIR filter coefficients for a Butterworth low-pass filter."""
-    # Pre-warp analog frequency
-    wc = 2.0 * sr * np.tan(np.pi * cutoff / sr)
-    # Bilinear transform of 1st/2nd order analog sections
-    # For order=4, cascade two 2nd-order sections (biquads)
-    from math import cos, sin, pi
-    sections = []
-    for k in range(order):
-        theta = pi * (2 * k + order + 1) / (2 * order)
-        # Analog pole: s = wc * exp(j*theta)
-        real = cos(theta)
-        imag = sin(theta)
-        # Bilinear transform: z = (1 + s/(2*sr)) / (1 - s/(2*sr))
-        # For 2nd order section from conjugate pair
-        if imag >= 0 and k < order // 2:
-            # Pair poles k and (order-1-k)
-            a_real = wc * real
-            a_imag = wc * imag
-            # Bilinear: s -> 2*sr*(z-1)/(z+1)
-            # H(z) = wc^2 / (s^2 - 2*a_real*s + (a_real^2+a_imag^2))
-            K = 2.0 * sr
-            denom_real = K * K - 2.0 * a_real * K + a_real * a_real + a_imag * a_imag
-            b0 = wc * wc / denom_real
-            sections.append((a_real, a_imag, K))
-    return sections
-
-
 def _silent_like(frame: rtc.AudioFrame) -> rtc.AudioFrame:
     """A frame of digital silence matching ``frame``'s shape."""
     return rtc.AudioFrame(
@@ -83,35 +50,50 @@ def _silent_like(frame: rtc.AudioFrame) -> rtc.AudioFrame:
 
 
 class _HFRolloffFilter:
-    """Stateful 4th-order Butterworth low-pass at 4kHz for 16kHz audio.
+    """Stateful high-shelf cut above ~5kHz for 16kHz audio.
 
-    Blends filtered output with original using a wet/dry ratio so speech
-    fundamentals pass through unchanged while high frequencies are tamed.
+    DTLN's spectral mask can leave high frequencies untouched while it
+    suppresses low/mid, which sounds thin and metallic. This lowers the band
+    above ~5kHz to 30% of its level (-10.5 dB, the floor the earlier 70/30
+    wet/dry blend aimed for) and leaves the speech band alone: under 0.5 dB of
+    loss up to 3kHz, 0.9 dB at 3.4kHz.
+
+    One biquad (RBJ high shelf, S=1) in transposed direct form II, with state
+    carried across calls, so any chunk size gives the same output.
     """
 
-    def __init__(self, cutoff: float = 4000.0, sr: float = 16000.0, blend: float = 0.7):
-        # Simple 1st-order IIR as a building block — cascade 4 for steeper rolloff
-        # alpha = dt / (RC + dt) where RC = 1/(2*pi*cutoff)
-        rc = 1.0 / (2.0 * np.pi * cutoff)
-        dt = 1.0 / sr
-        self._alpha = np.float32(dt / (rc + dt))
-        self._blend = np.float32(blend)  # 0=bypass, 1=full filter
-        # 4 cascaded states for 4th-order rolloff
-        self._states = [np.float32(0.0)] * 4
+    def __init__(self, sr: float = 16000.0, shelf_hz: float = 5000.0, floor: float = 0.3):
+        a_lin = np.sqrt(floor)  # shelf amplitude: sqrt of the high-band gain
+        w0 = 2.0 * np.pi * shelf_hz / sr
+        cos_w0 = np.cos(w0)
+        alpha = np.sin(w0) / np.sqrt(2.0)  # S = 1
+        two_sqrt_a_alpha = 2.0 * np.sqrt(a_lin) * alpha
+        a0 = (a_lin + 1) - (a_lin - 1) * cos_w0 + two_sqrt_a_alpha
+        self._b = (
+            a_lin * ((a_lin + 1) + (a_lin - 1) * cos_w0 + two_sqrt_a_alpha) / a0,
+            -2.0 * a_lin * ((a_lin - 1) + (a_lin + 1) * cos_w0) / a0,
+            a_lin * ((a_lin + 1) + (a_lin - 1) * cos_w0 - two_sqrt_a_alpha) / a0,
+        )
+        self._a = (
+            2.0 * ((a_lin - 1) - (a_lin + 1) * cos_w0) / a0,
+            ((a_lin + 1) - (a_lin - 1) * cos_w0 - two_sqrt_a_alpha) / a0,
+        )
+        self._z1 = 0.0
+        self._z2 = 0.0
 
     def process(self, samples: np.ndarray) -> np.ndarray:
-        """Filter samples in-place, returns filtered array."""
-        out = samples.copy()
-        alpha = self._alpha
-        blend = self._blend
-        for stage in range(4):
-            state = self._states[stage]
-            for i in range(len(out)):
-                state = state + alpha * (out[i] - state)
-                out[i] = state
-            self._states[stage] = state
-        # Blend: keep most of the filtered signal, mix a bit of original
-        return blend * out + (1.0 - blend) * samples
+        """Return the filtered samples; ``samples`` is not modified."""
+        b0, b1, b2 = self._b
+        a1, a2 = self._a
+        z1, z2 = self._z1, self._z2
+        out = np.empty(len(samples), dtype=np.float32)
+        for i, x in enumerate(samples.astype(np.float64)):
+            y = b0 * x + z1
+            z1 = b1 * x - a1 * y + z2
+            z2 = b2 * x - a2 * y
+            out[i] = y
+        self._z1, self._z2 = z1, z2
+        return out
 
 _DTLN_BASE_URL = "https://github.com/breizhn/DTLN/raw/master/pretrained_model"
 _MODEL_FILES = ["model_1.onnx", "model_2.onnx"]
@@ -324,7 +306,7 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
             out_16k = self._output_queue[:n_16k]
             self._output_queue = self._output_queue[n_16k:]
 
-            # High-frequency rolloff to prevent metallic artifacts
+            # High-shelf cut to prevent metallic artifacts
             out_16k = self._hf_rolloff.process(out_16k)
 
             # Wet/dry blend: mix denoised with original to prevent over-suppression.
