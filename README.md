@@ -18,7 +18,7 @@ Runs entirely **in-process** using [ONNX Runtime](https://onnxruntime.ai). No cl
 | **Hosting** | Self-hosted, in-process | Cloud API required |
 | **Cost** | Free (open weights) | Per-minute billing |
 | **LiveKit** | Works with self-hosted | Requires LiveKit Cloud |
-| **Latency** | ~33 ms added to the audio (24 ms model window + 8.5 ms hop lead) | Network round-trip |
+| **Latency** | ~34 ms added to the audio (24 ms model window + 8.5 ms hop lead + rate conversion) | Network round-trip |
 | **Privacy** | Audio never leaves your server | Audio sent to third party |
 | **Real-time factor** | ~0.05× | Varies |
 
@@ -145,7 +145,7 @@ Input frame (any sample rate, any channels)
 → Denoised output frame
 ```
 
-The overlap-add synthesis uses 75% overlap (512-sample window, 128-sample shift), identical to the original DTLN paper. A sample leaves the synthesis buffer once the window has slid past it, so the model itself delays audio by 24 ms (384 samples at 16 kHz). The plugin adds an 8.5 ms lead to cover the 128-sample hop and under 1 ms per rate conversion, for about 33 ms end to end at 8, 16, 24, 32 and 48 kHz. Other input rates (44.1 kHz, for example) go through LiveKit's buffering resampler and take about 125 ms.
+The overlap-add synthesis uses 75% overlap (512-sample window, 128-sample shift), identical to the original DTLN paper. A sample leaves the synthesis buffer once the window has slid past it, so the model itself delays audio by 24 ms (384 samples at 16 kHz). The plugin adds an 8.5 ms lead to cover the 128-sample hop and about 1 ms per rate conversion, for about 34.5 ms end to end at 24, 32 and 48 kHz, 32.5 ms at 16 kHz and 36.5 ms at 8 kHz. Other input rates (44.1 kHz, for example) go through LiveKit's buffering resampler and take about 125 ms.
 
 ---
 

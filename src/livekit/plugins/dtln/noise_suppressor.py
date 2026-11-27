@@ -103,14 +103,16 @@ class _HFRolloffFilter:
 
 
 class _FirResampler:
-    """Streaming rational rate converter with under 1 ms of delay.
+    """Streaming rational rate converter with about 1 ms of delay.
 
     Zero-stuffs by ``up``, low-passes with a Kaiser-windowed sinc and keeps
-    every ``down``-th sample.  The filter is centred on the lower Nyquist
-    frequency with a transition band 3/8 of it wide (6.5-9.5 kHz when the lower
-    rate is 16 kHz) and about 50 dB of stopband rejection.  Filter history and
-    decimation phase are carried across calls, so any chunk size gives the same
-    output, and nothing is held back beyond the filter's own group delay.
+    every ``down``-th sample.  The stopband starts at the lower Nyquist
+    frequency, so nothing that would alias or image gets through at more than
+    about -50 dB, and the transition band is the top 3/16 below it (6.5-8 kHz
+    when the lower rate is 16 kHz).  Filter history and decimation phase are
+    carried across calls, so any chunk size gives the same output, and nothing
+    is held back beyond the filter's own group delay (1 ms at 16 kHz and
+    above, 2 ms at 8 kHz).
     """
 
     holds_audio = False
@@ -122,10 +124,11 @@ class _FirResampler:
         hi = in_rate * self._up
         nyquist = min(in_rate, out_rate) / 2.0
         atten_db = 50.0
-        width = 0.375 * nyquist
+        width = 0.1875 * nyquist
+        cutoff = nyquist - width / 2.0
         n = int(math.ceil((atten_db - 8.0) / (2.285 * 2.0 * math.pi * width / hi))) | 1
         k = np.arange(n) - (n - 1) / 2.0
-        taps = np.sinc(2.0 * nyquist / hi * k) * np.kaiser(n, 0.1102 * (atten_db - 8.7))
+        taps = np.sinc(2.0 * cutoff / hi * k) * np.kaiser(n, 0.1102 * (atten_db - 8.7))
         self._taps = (taps / taps.sum() * self._up).astype(np.float32)
         self._hist = np.zeros(n - 1, dtype=np.float32)
         self._phase = 0
@@ -318,6 +321,11 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
 
         # Lazily create resamplers when we learn the incoming sample rate.
         if frame.sample_rate != self._native_rate:
+            if self._native_rate:
+                # Queued output is at the old rate, and the new converters may
+                # need a different start-up.
+                self._out_native = np.zeros(0, dtype=np.float32)
+                self._primed = False
             self._native_rate = frame.sample_rate
             if frame.sample_rate != _SAMPLE_RATE:
                 self._downsampler = _make_resampler(frame.sample_rate, _SAMPLE_RATE)

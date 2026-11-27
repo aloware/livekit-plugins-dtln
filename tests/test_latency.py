@@ -18,8 +18,8 @@ from livekit.plugins.dtln.noise_suppressor import (
 )
 
 FIR_RATES = [8000, 16000, 24000, 32000, 48000]
-# 24 ms window + 8.5 ms hop lead + under 1 ms per converter, with headroom.
-MAX_DELAY_MS = 36.0
+# 24 ms window + 8.5 ms hop lead + 1 ms per converter (2 ms at 8 kHz).
+MAX_DELAY_MS = 37.0
 
 
 def _noise(sr: int, seconds: float = 3.0) -> np.ndarray:
@@ -44,11 +44,9 @@ def _run(ns: DTLNNoiseSuppressor, pcm: np.ndarray, sr: int, frame_samples: int) 
 
 def _delay_ms(reference: np.ndarray, delayed: np.ndarray, sr: int) -> float:
     """Lag of ``delayed`` behind ``reference`` at the cross-correlation peak."""
-    max_lag = sr * 300 // 1000
-    span = min(len(reference), len(delayed)) - max_lag
-    ref = reference[:span]
-    scores = [float(np.dot(ref, delayed[lag : lag + span])) for lag in range(max_lag)]
-    return 1000.0 * int(np.argmax(scores)) / sr
+    n = 1 << (len(reference) + len(delayed)).bit_length()
+    xcorr = np.fft.irfft(np.fft.rfft(delayed, n) * np.conj(np.fft.rfft(reference, n)), n)
+    return 1000.0 * int(np.argmax(xcorr[: sr * 300 // 1000])) / sr
 
 
 @pytest.mark.parametrize("sr", FIR_RATES)
@@ -109,9 +107,35 @@ def test_fir_converter_passes_the_speech_band(in_rate, freq):
     assert abs(_tone_gain_db(in_rate, 16000, freq)) < 0.5
 
 
-@pytest.mark.parametrize("in_rate,freq", [(24000, 10000), (24000, 11500), (48000, 10000), (48000, 15000), (48000, 20000)])
+@pytest.mark.parametrize(
+    "in_rate,freq",
+    [(24000, 8500), (24000, 9000), (24000, 11500), (48000, 8500), (48000, 9000), (48000, 15000), (48000, 20000)],
+)
 def test_fir_converter_rejects_what_would_alias(in_rate, freq):
     assert _tone_gain_db(in_rate, 16000, freq) < -40.0
+
+
+def test_fir_converter_leaves_no_image_above_the_source_band():
+    """Upsampling a 7.5 kHz tone must not leave its mirror at 8.5 kHz."""
+    rs = _FirResampler(16000, 48000)
+    t = np.arange(16000) / 16000
+    y = rs.push(np.sin(2 * np.pi * 7500 * t).astype(np.float32))[12000:]
+    spectrum = np.abs(np.fft.rfft(y * np.hanning(len(y))))
+    freqs = np.fft.rfftfreq(len(y), 1 / 48000)
+    tone = spectrum[(freqs > 7300) & (freqs < 7700)].max()
+    image = spectrum[(freqs > 8300) & (freqs < 8700)].max()
+    assert 20 * np.log10(image / tone) < -30.0
+
+
+def test_a_rate_change_drops_queued_output_and_starts_again():
+    ns = DTLNNoiseSuppressor(strength=0.0)
+    _run(ns, _noise(48000, 1.0), 48000, 480)
+    assert len(ns._out_native) > 0
+    out = _run(ns, _noise(24000, 2.0), 24000, 240)
+    assert ns._underruns == 0
+    assert float(np.sqrt((out[24000:] ** 2).mean())) > 0.01
+    delay = _delay_ms(_noise(24000, 2.0).astype(np.float64) / 32768.0, out, 24000)
+    assert delay <= MAX_DELAY_MS + 10.0
 
 
 def test_fir_converter_output_does_not_depend_on_chunking():
