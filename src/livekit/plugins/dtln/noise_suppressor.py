@@ -270,6 +270,10 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self._out_native = np.zeros(0, dtype=np.float32)
         self._primed = False
         self._underruns = 0
+        # 16 kHz samples already inside the hop loop or queued behind it when
+        # start-up last began.  They count towards the lead: zero on a fresh
+        # stream, non-zero after a change of input rate.
+        self._carried_16k = 0
 
         # Wet/dry blend: 0.0 = full bypass, 1.0 = full suppression
         self._strength = max(0.0, min(1.0, strength))
@@ -326,6 +330,7 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
                 # need a different start-up.
                 self._out_native = np.zeros(0, dtype=np.float32)
                 self._primed = False
+                self._carried_16k = len(self._input_queue) + len(self._output_queue)
             self._native_rate = frame.sample_rate
             if frame.sample_rate != _SAMPLE_RATE:
                 self._downsampler = _make_resampler(frame.sample_rate, _SAMPLE_RATE)
@@ -404,7 +409,8 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         if not self._primed and not self._converters_hold_audio():
             # Nothing buffers except the hop loop, so a fixed lead of silence
             # is enough and the first frame is answered straight away.
-            lead = math.ceil(_HOP_RESERVE_16K * self._resample_ratio())
+            lead_16k = max(_HOP_RESERVE_16K - self._carried_16k, _HOP_RESERVE_16K - _BLOCK_SHIFT)
+            lead = math.ceil(lead_16k * self._resample_ratio())
             self._out_native = np.concatenate([
                 np.zeros(lead, dtype=np.float32), self._out_native
             ])
