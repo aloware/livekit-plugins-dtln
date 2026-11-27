@@ -9,6 +9,7 @@ Drop-in replacement for livekit-plugins-noise-cancellation / ai-coustics.
 """
 
 import logging
+import math
 import os
 import urllib.request
 
@@ -24,12 +25,17 @@ _SAMPLE_RATE = 16_000
 _BLOCK_LEN = 512
 _BLOCK_SHIFT = 128
 
-# Denoised audio held back before the first frame is released, in 16 kHz
-# samples.  The core only emits whole 128-sample hops, and both resamplers keep
-# partial samples of their own, so the amount ready when a frame has to be
-# answered is never exactly a frame.  Holding one block covers the shortfall,
-# which turns what used to be a recurring gap into fixed startup latency.
+# Silence put in front of the output, in 16 kHz samples.  The core only emits
+# whole 128-sample hops, so up to 127 samples of a frame can still be inside it
+# when the frame has to be answered.  One hop of lead covers that; the extra
+# samples absorb the rounding of the two rate converters.
+_HOP_RESERVE_16K = _BLOCK_SHIFT + 8
+# Denoised audio held back before the first frame is released when the rate
+# converters buffer audio of their own (see _SoxrResampler), in 16 kHz samples.
 _PRIME_RESERVE_16K = _BLOCK_LEN
+# Largest up or down factor the short FIR converter handles.  Rates outside it
+# (44.1 kHz needs 160/441) would need thousands of taps per frame.
+_MAX_FIR_FACTOR = 8
 # rfft of 512-sample block gives 257 unique frequency bins
 _N_BINS = _BLOCK_LEN // 2 + 1
 # Overlap-add latency: a sample only leaves the synthesis buffer once the
@@ -94,6 +100,95 @@ class _HFRolloffFilter:
             out[i] = y
         self._z1, self._z2 = z1, z2
         return out
+
+
+class _FirResampler:
+    """Streaming rational rate converter with under 1 ms of delay.
+
+    Zero-stuffs by ``up``, low-passes with a Kaiser-windowed sinc and keeps
+    every ``down``-th sample.  The filter is centred on the lower Nyquist
+    frequency with a transition band 3/8 of it wide (6.5-9.5 kHz when the lower
+    rate is 16 kHz) and about 50 dB of stopband rejection.  Filter history and
+    decimation phase are carried across calls, so any chunk size gives the same
+    output, and nothing is held back beyond the filter's own group delay.
+    """
+
+    holds_audio = False
+
+    def __init__(self, in_rate: int, out_rate: int) -> None:
+        g = math.gcd(in_rate, out_rate)
+        self._up = out_rate // g
+        self._down = in_rate // g
+        hi = in_rate * self._up
+        nyquist = min(in_rate, out_rate) / 2.0
+        atten_db = 50.0
+        width = 0.375 * nyquist
+        n = int(math.ceil((atten_db - 8.0) / (2.285 * 2.0 * math.pi * width / hi))) | 1
+        k = np.arange(n) - (n - 1) / 2.0
+        taps = np.sinc(2.0 * nyquist / hi * k) * np.kaiser(n, 0.1102 * (atten_db - 8.7))
+        self._taps = (taps / taps.sum() * self._up).astype(np.float32)
+        self._hist = np.zeros(n - 1, dtype=np.float32)
+        self._phase = 0
+
+    @staticmethod
+    def supports(in_rate: int, out_rate: int) -> bool:
+        g = math.gcd(in_rate, out_rate)
+        return max(in_rate // g, out_rate // g) <= _MAX_FIR_FACTOR
+
+    def push(self, samples: np.ndarray) -> np.ndarray:
+        if len(samples) == 0:
+            return np.zeros(0, dtype=np.float32)
+        stuffed = np.zeros(len(samples) * self._up, dtype=np.float32)
+        stuffed[:: self._up] = samples
+        buf = np.concatenate([self._hist, stuffed])
+        filtered = np.convolve(buf, self._taps, mode="valid")
+        out = filtered[self._phase :: self._down]
+        self._phase += len(out) * self._down - len(filtered)
+        self._hist = buf[len(buf) - len(self._hist) :]
+        return out.astype(np.float32)
+
+
+class _SoxrResampler:
+    """LiveKit's resampler behind the same float interface, for any rate.
+
+    It buffers around 20 ms per direction and releases it unevenly, so the
+    suppressor has to queue output before it starts answering frames.
+    """
+
+    holds_audio = True
+
+    def __init__(self, in_rate: int, out_rate: int) -> None:
+        self._in_rate = in_rate
+        self._resampler = rtc.AudioResampler(
+            input_rate=in_rate,
+            output_rate=out_rate,
+            num_channels=1,
+            quality=rtc.AudioResamplerQuality.MEDIUM,
+        )
+
+    def push(self, samples: np.ndarray) -> np.ndarray:
+        pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
+        frames = self._resampler.push(
+            rtc.AudioFrame(
+                data=pcm.tobytes(),
+                sample_rate=self._in_rate,
+                num_channels=1,
+                samples_per_channel=len(pcm),
+            )
+        )
+        if not frames:
+            return np.zeros(0, dtype=np.float32)
+        return np.concatenate([
+            np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
+            for f in frames
+        ])
+
+
+def _make_resampler(in_rate: int, out_rate: int) -> "_FirResampler | _SoxrResampler":
+    if _FirResampler.supports(in_rate, out_rate):
+        return _FirResampler(in_rate, out_rate)
+    return _SoxrResampler(in_rate, out_rate)
+
 
 _DTLN_BASE_URL = "https://github.com/breizhn/DTLN/raw/master/pretrained_model"
 _MODEL_FILES = ["model_1.onnx", "model_2.onnx"]
@@ -181,8 +276,8 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         self._debug_frame_count = 0
 
         # Resamplers — created lazily on the first frame
-        self._downsampler: rtc.AudioResampler | None = None
-        self._upsampler: rtc.AudioResampler | None = None
+        self._downsampler: _FirResampler | _SoxrResampler | None = None
+        self._upsampler: _FirResampler | _SoxrResampler | None = None
         self._native_rate: int = 0
 
         self._enabled = True
@@ -225,18 +320,8 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         if frame.sample_rate != self._native_rate:
             self._native_rate = frame.sample_rate
             if frame.sample_rate != _SAMPLE_RATE:
-                self._downsampler = rtc.AudioResampler(
-                    input_rate=frame.sample_rate,
-                    output_rate=_SAMPLE_RATE,
-                    num_channels=1,
-                    quality=rtc.AudioResamplerQuality.MEDIUM,
-                )
-                self._upsampler = rtc.AudioResampler(
-                    input_rate=_SAMPLE_RATE,
-                    output_rate=frame.sample_rate,
-                    num_channels=1,
-                    quality=rtc.AudioResamplerQuality.MEDIUM,
-                )
+                self._downsampler = _make_resampler(frame.sample_rate, _SAMPLE_RATE)
+                self._upsampler = _make_resampler(_SAMPLE_RATE, frame.sample_rate)
             else:
                 self._downsampler = None
                 self._upsampler = None
@@ -246,33 +331,15 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
         if frame.num_channels > 1:
             samples = samples.reshape(-1, frame.num_channels).mean(axis=1)
 
-        # Build a mono AudioFrame at the native rate for the resampler
-        mono_int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
-        mono_frame = rtc.AudioFrame(
-            data=mono_int16.tobytes(),
-            sample_rate=frame.sample_rate,
-            num_channels=1,
-            samples_per_channel=len(mono_int16),
-        )
-
-        # Downsample to 16 kHz
+        # Downsample to 16 kHz.  An empty result is a buffering converter
+        # still filling at startup.  The frame is not passed through: it has
+        # not been denoised, and splicing raw audio into a denoised stream is
+        # audible.  Fall through and let the output queue decide what to hand
+        # back.
         if self._downsampler is not None:
-            frames_16k = self._downsampler.push(mono_frame)
+            samples_16k = self._downsampler.push(samples)
         else:
-            frames_16k = [mono_frame]
-
-        # An empty list is the resampler still buffering at startup.  The frame
-        # is not passed through: it has not been denoised, and splicing raw
-        # audio into a denoised stream is audible.  Fall through and let the
-        # output queue decide what to hand back.
-        samples_16k = (
-            np.concatenate([
-                np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
-                for f in frames_16k
-            ])
-            if frames_16k
-            else np.zeros(0, dtype=np.float32)
-        )
+            samples_16k = samples
 
         self._input_queue = np.concatenate([self._input_queue, samples_16k])
         self._dry_queue = np.concatenate([self._dry_queue, samples_16k])
@@ -317,32 +384,23 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
                 out_16k = self._strength * out_16k + (1.0 - self._strength) * dry_16k
             self._dry_queue = self._dry_queue[n_16k:]
 
-            # Build 16 kHz AudioFrame and upsample back to native rate
-            out_int16_16k = (np.clip(out_16k, -1.0, 1.0) * 32767.0).astype(np.int16)
-            out_frame_16k = rtc.AudioFrame(
-                data=out_int16_16k.tobytes(),
-                sample_rate=_SAMPLE_RATE,
-                num_channels=1,
-                samples_per_channel=len(out_int16_16k),
-            )
-
+            # Upsample back to the native rate
+            out_16k = np.clip(out_16k, -1.0, 1.0).astype(np.float32)
             if self._upsampler is not None:
-                out_frames = self._upsampler.push(out_frame_16k)
-            else:
-                out_frames = [out_frame_16k]
-
-            if out_frames:
-                self._out_native = np.concatenate([
-                    self._out_native,
-                    *(
-                        np.frombuffer(f.data, dtype=np.int16).astype(np.float32) / 32768.0
-                        for f in out_frames
-                    ),
-                ])
+                out_16k = self._upsampler.push(out_16k)
+            self._out_native = np.concatenate([self._out_native, out_16k])
 
         # Hand back exactly one frame's worth, taken from the queue rather than
         # from whatever this particular call happened to finish.
         target = frame.samples_per_channel
+        if not self._primed and not self._converters_hold_audio():
+            # Nothing buffers except the hop loop, so a fixed lead of silence
+            # is enough and the first frame is answered straight away.
+            lead = math.ceil(_HOP_RESERVE_16K * self._resample_ratio())
+            self._out_native = np.concatenate([
+                np.zeros(lead, dtype=np.float32), self._out_native
+            ])
+            self._primed = True
         if not self._primed:
             reserve = target + int(_PRIME_RESERVE_16K * self._resample_ratio())
             if len(self._out_native) < reserve:
@@ -385,6 +443,12 @@ class DTLNNoiseSuppressor(rtc.FrameProcessor[rtc.AudioFrame]):
     def _resample_ratio(self) -> float:
         """Native samples per 16 kHz sample, for sizing the reserve."""
         return (self._native_rate / _SAMPLE_RATE) if self._native_rate else 1.0
+
+    def _converters_hold_audio(self) -> bool:
+        return bool(
+            (self._downsampler is not None and self._downsampler.holds_audio)
+            or (self._upsampler is not None and self._upsampler.holds_audio)
+        )
 
     def _close(self) -> None:
         self._enabled = False
