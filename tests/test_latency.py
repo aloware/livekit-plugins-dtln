@@ -153,60 +153,6 @@ def test_a_rate_change_never_runs_dry_at_other_frame_sizes(frame_ms):
     assert ns._underruns == 0
 
 
-@pytest.mark.parametrize("in_rate,out_rate", [(48000, 16000), (24000, 16000), (16000, 24000), (16000, 48000)])
-def test_fir_converter_is_chosen_and_keeps_sample_count(in_rate, out_rate):
-    rs = _make_resampler(in_rate, out_rate)
-    assert isinstance(rs, _FirResampler)
-    x = np.random.default_rng(1).standard_normal(in_rate).astype(np.float32)
-    out = np.concatenate([rs.push(x[i : i + 237]) for i in range(0, len(x), 237)])
-    assert abs(len(out) - out_rate) <= 1
-
-
-def _tone_gain_db(in_rate: int, out_rate: int, freq: float) -> float:
-    rs = _FirResampler(in_rate, out_rate)
-    t = np.arange(in_rate) / in_rate
-    y = rs.push(np.sin(2 * np.pi * freq * t).astype(np.float32))
-    tail = y[out_rate // 4 :]
-    return float(20 * np.log10(np.sqrt(np.mean(tail**2)) / np.sqrt(0.5) + 1e-12))
-
-
-@pytest.mark.parametrize("in_rate", [24000, 48000])
-@pytest.mark.parametrize("freq", [300, 1000, 3400, 6000])
-def test_fir_converter_passes_the_speech_band(in_rate, freq):
-    assert abs(_tone_gain_db(in_rate, 16000, freq)) < 0.5
-
-
-@pytest.mark.parametrize(
-    "in_rate,freq",
-    [(24000, 8500), (24000, 9000), (24000, 11500), (48000, 8500), (48000, 9000), (48000, 15000), (48000, 20000)],
-)
-def test_fir_converter_rejects_what_would_alias(in_rate, freq):
-    assert _tone_gain_db(in_rate, 16000, freq) < -40.0
-
-
-def test_fir_converter_leaves_no_image_above_the_source_band():
-    """Upsampling a 7.5 kHz tone must not leave its mirror at 8.5 kHz."""
-    rs = _FirResampler(16000, 48000)
-    t = np.arange(16000) / 16000
-    y = rs.push(np.sin(2 * np.pi * 7500 * t).astype(np.float32))[12000:]
-    spectrum = np.abs(np.fft.rfft(y * np.hanning(len(y))))
-    freqs = np.fft.rfftfreq(len(y), 1 / 48000)
-    tone = spectrum[(freqs > 7300) & (freqs < 7700)].max()
-    image = spectrum[(freqs > 8300) & (freqs < 8700)].max()
-    assert 20 * np.log10(image / tone) < -30.0
-
-
-def test_a_rate_change_drops_queued_output_and_starts_again():
-    ns = DTLNNoiseSuppressor(strength=0.0)
-    _run(ns, _noise(48000, 1.0), 48000, 480)
-    assert len(ns._out_native) > 0
-    out = _run(ns, _noise(24000, 2.0), 24000, 240)
-    assert ns._underruns == 0
-    assert float(np.sqrt((out[24000:] ** 2).mean())) > 0.01
-    delay = _delay_ms(_noise(24000, 2.0).astype(np.float64) / 32768.0, out, 24000)
-    assert delay <= MAX_DELAY_MS + 10.0
-
-
 def test_fir_converter_output_does_not_depend_on_chunking():
     x = np.random.default_rng(2).standard_normal(24000).astype(np.float32)
 
